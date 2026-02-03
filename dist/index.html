@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="A modern, offline-capable EPUB reader" />
+  <meta name="theme-color" content="#7dd3fc" />
+  <link rel="manifest" href="manifest.json" />
+  <title>Squidread - EPUB reader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3/dist/epub.min.js"></script>
+</head>
+<body>
+  <!-- Inline progress indicator for reading/downloading/saving -->
+  <section id="progress" class="progress" aria-live="polite" aria-atomic="true">
+    <div class="bar"><div id="progressFill" class="fill"></div></div>
+    <div id="progressLabel" class="label"></div>
+  </section>
+
+  <!-- Toast notification for quick feedback -->
+  <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <main class="layout">
+    <aside class="panel hidden" id="panel">
+      <div class="panelHeader">
+        <button id="swRefresh" class="ghost" title="Refresh service worker">🔄</button>
+        <h2 id="menuTitle">Squidread</h2>
+        <button id="closePanel" class="ghost" title="Close menu">✕</button>
+      </div>
+      
+      <nav class="panelNav">
+        <button id="navStyles" class="navBtn active">Styles</button>
+        <button id="navContents" class="navBtn">Contents</button>
+        <button id="navLibrary" class="navBtn">Library</button>
+      </nav>
+
+      <div class="panelContent">
+        <section id="librarySection" class="panelSection">
+          <ul id="library" class="library">
+            <li class="libraryAddItem">
+              <button id="addEpubBtn" class="addEpubButton">
+                <span class="addEpubPlus">+</span>
+                <span class="addEpubText">Add EPUB</span>
+              </button>
+              <input type="file" id="filePicker" accept="application/epub+zip,.epub" class="hidden" />
+            </li>
+          </ul>
+        </section>
+
+        <section id="contentsSection" class="panelSection">
+          <ul id="tocList" class="tocList">
+            <li class="meta">Open a book to see its table of contents.</li>
+          </ul>
+        </section>
+
+        <section id="stylesSection" class="panelSection active">
+          <div class="cardHeader">
+            <h2>Styles</h2>
+          </div>
+          <div class="stylesContent">
+            <div class="stylesWindow"></div>
+            <div class="fontSizeControl">
+              <button id="fontSizeDecrease" class="fontSizeBtn" title="Decrease font size">−</button>
+              <button id="fontSizeReset" class="fontSizeBtn" title="Reset font size">Reset</button>
+              <button id="fontSizeIncrease" class="fontSizeBtn" title="Increase font size">+</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </aside>
+
+    <section class="reader">
+      <div id="viewer" class="viewer"></div>
+      <div class="readerControls">
+        <button id="prev" class="controlBtn prevBtn" title="Previous page">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <button id="menuBtn" class="controlBtn menuBtn" title="Open menu">☰</button>
+        <button id="next" class="controlBtn nextBtn" title="Next page">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
+      <footer class="readerFooter">
+        <div class="footerLeft">
+          <span id="clock" class="clock">--:--</span>
+        </div>
+        <div class="footerCenter">
+          <span id="chapterInfo" class="chapterInfo">-</span>
+        </div>
+        <div class="footerRight">
+          <span id="progressPercent" class="progressPercent">-</span>
+        </div>
+      </footer>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
