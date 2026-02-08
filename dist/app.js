@@ -235,6 +235,47 @@ function wireEvents() {
   window.addEventListener('beforeunload', () => {
     persistCurrentLocation();
   });
+
+  // Setup install modal handlers
+  let deferredPrompt;
+  const installModal = document.getElementById('installModal');
+  const installBtn = document.getElementById('installBtn');
+  const installDismiss = document.getElementById('installDismiss');
+  const installModalClose = document.getElementById('installModalClose');
+
+  if (installModal && installBtn && installDismiss && installModalClose) {
+    const closeModal = () => {
+      installModal.close();
+      sessionStorage.setItem('dismissedInstall', 'true');
+    };
+
+    installBtn.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        log.info('Install outcome:', outcome);
+        deferredPrompt = null;
+      }
+      closeModal();
+    });
+
+    installDismiss.addEventListener('click', closeModal);
+    installModalClose.addEventListener('click', closeModal);
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const dismissedInstall = sessionStorage.getItem('dismissedInstall');
+      if (!dismissedInstall) {
+        installModal.showModal();
+      }
+    });
+
+    window.addEventListener('appinstalled', () => {
+      installModal.close();
+      log.info('App installed');
+    });
+  }
 }
 async function handleLocalFile(file) {
   if (isProcessing) {
@@ -997,3 +1038,4 @@ function maybeLogProgress(kind, percent) {
     }
   }
 }
+

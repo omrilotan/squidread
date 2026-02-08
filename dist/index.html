@@ -24,6 +24,21 @@
   <!-- Toast notification for quick feedback -->
   <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
+  <!-- Install App Modal -->
+  <dialog id="installModal" class="installModal">
+    <div class="installModalContent">
+      <button id="installModalClose" class="installModalClose" aria-label="Close">✕</button>
+      <div class="installModalBody">
+        <h2>Install Squidread</h2>
+        <p>Get quick access to your EPUB reader on your home screen.</p>
+        <div class="installModalButtons">
+          <button id="installBtn" class="installButton primary">Install App</button>
+          <button id="installDismiss" class="installButton secondary">Not Now</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
   <main class="layout">
     <aside class="panel hidden" id="panel">
       <div class="panelHeader">

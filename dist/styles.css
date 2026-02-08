@@ -773,3 +773,114 @@ button.ghost {
 .fontSizeBtn:active {
   transform: scale(0.98);
 }
+
+/* Install Modal */
+.installModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.installModal::backdrop {
+  background: transparent;
+}
+
+.installModal[open] {
+  display: flex;
+}
+
+.installModalContent {
+  background: #1e293b;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 20px 25px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.installModalClose {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.installModalClose:hover {
+  background: rgba(125, 211, 252, 0.1);
+  color: #7dd3fc;
+}
+
+.installModalBody {
+  margin-top: 8px;
+}
+
+.installModalBody h2 {
+  margin: 0 0 12px 0;
+  font-size: 20px;
+  color: #f1f5f9;
+}
+
+.installModalBody p {
+  margin: 0 0 24px 0;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+.installModalButtons {
+  display: flex;
+  gap: 12px;
+  flex-direction: column-reverse;
+}
+
+.installButton {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.installButton.primary {
+  background: #7dd3fc;
+  color: #0f172a;
+}
+
+.installButton.primary:hover {
+  background: #06b6d4;
+}
+
+.installButton.secondary {
+  background: transparent;
+  color: #7dd3fc;
+  border: 1px solid #7dd3fc;
+}
+
+.installButton.secondary:hover {
+  background: rgba(125, 211, 252, 0.1);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
