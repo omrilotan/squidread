@@ -5,7 +5,7 @@ const prevBtn = document.getElementById('prev');
 const nextBtn = document.getElementById('next');
 const menuBtn = document.getElementById('menuBtn');
 const closePanelBtn = document.getElementById('closePanel');
-const swRefreshBtn = document.getElementById('swRefresh');
+const swRefreshLink = document.getElementById('swRefreshLink');
 const panelEl = document.getElementById('panel');
 const filePicker = document.getElementById('filePicker');
 const toastEl = document.getElementById('toast');
@@ -131,12 +131,17 @@ function wireEvents() {
   nextBtn.addEventListener('click', () => rendition?.next());
   menuBtn.addEventListener('click', () => togglePanel());
   closePanelBtn.addEventListener('click', () => closePanel());
-  swRefreshBtn.addEventListener('click', refreshServiceWorker);
+  swRefreshLink?.addEventListener('click', async (event) => {
+    event.preventDefault();
+    await refreshServiceWorker();
+    window.location.reload();
+  });
 
   // Wire up navigation buttons
   document.getElementById('navLibrary')?.addEventListener('click', () => switchPanelSection('library'));
   document.getElementById('navContents')?.addEventListener('click', () => switchPanelSection('contents'));
   document.getElementById('navStyles')?.addEventListener('click', () => switchPanelSection('styles'));
+  document.getElementById('navSettings')?.addEventListener('click', () => switchPanelSection('settings'));
 
   // Wire up font size controls
   document.getElementById('fontSizeDecrease')?.addEventListener('click', () => adjustFontSize(-0.1));
@@ -222,6 +227,11 @@ function wireEvents() {
     }
   });
 
+  chapterInfoEl?.addEventListener('click', () => {
+    panelEl.classList.remove('hidden');
+    switchPanelSection('contents');
+  });
+
   window.addEventListener('resize', () => {
     resizeRendition();
   });
@@ -299,7 +309,6 @@ async function handleLocalFile(file) {
     showToast('Failed to read file');
   } finally {
     isProcessing = false;
-    fileForm?.reset();
   }
 }
 
@@ -337,8 +346,12 @@ async function saveBook(name, blob) {
     // Try to get cover image and convert to data URL
     if (tempBook.cover) {
       try {
-        coverDataUrl = await tempBook.resources.createUrl(tempBook.cover);
-        log.debug('Cover extracted successfully');
+        const blobUrl = await tempBook.resources.createUrl(tempBook.cover);
+        // Fetch the blob and convert to data URL for persistence
+        const response = await fetch(blobUrl);
+        const coverBlob = await response.blob();
+        coverDataUrl = await blobToDataUrl(coverBlob);
+        log.debug('Cover extracted and converted to data URL');
       } catch (error) {
         log.warn('Could not extract cover image:', error);
       }
@@ -421,6 +434,13 @@ async function renderLibrary() {
     const li = document.createElement('li');
     li.className = 'libraryItem';
 
+    const hasCoverData = record.coverDataUrl && record.coverDataUrl.startsWith('data:');
+    if (hasCoverData) {
+      li.style.backgroundImage = `url(${record.coverDataUrl})`;
+      li.style.backgroundSize = 'cover';
+      li.style.backgroundPosition = 'center';
+    }
+
     // Create portrait button with cover image
     const portraitBtn = document.createElement('button');
     portraitBtn.className = 'portraitBtn';
@@ -432,25 +452,9 @@ async function renderLibrary() {
     const coverContainer = document.createElement('div');
     coverContainer.className = 'coverContainer';
 
-    const hasCoverData = record.coverDataUrl && !record.coverDataUrl.startsWith('blob:');
     if (hasCoverData) {
-      const img = document.createElement('img');
-      img.src = record.coverDataUrl;
-      img.alt = `Cover of ${record.title || record.name}`;
-      img.className = 'coverImage';
-      img.onerror = async () => {
-        img.remove();
-        coverContainer.className = 'coverContainer noCover';
-        const placeholder = document.createElement('div');
-        placeholder.className = 'coverPlaceholder';
-        placeholder.textContent = '📖';
-        coverContainer.appendChild(placeholder);
-        if (record.coverDataUrl) {
-          record.coverDataUrl = null;
-          await db.put('books', record);
-        }
-      };
-      coverContainer.appendChild(img);
+      // Cover exists, no need to show placeholder
+      coverContainer.className = 'coverContainer hasCover';
     } else {
       if (record.coverDataUrl && record.coverDataUrl.startsWith('blob:')) {
         record.coverDataUrl = null;
@@ -458,10 +462,6 @@ async function renderLibrary() {
       }
       // Placeholder for no cover
       coverContainer.className = 'coverContainer noCover';
-      const placeholder = document.createElement('div');
-      placeholder.className = 'coverPlaceholder';
-      placeholder.textContent = '📖';
-      coverContainer.appendChild(placeholder);
     }
 
     portraitBtn.appendChild(coverContainer);
@@ -829,6 +829,16 @@ function switchPanelSection(section) {
   // Update sections
   document.querySelectorAll('.panelSection').forEach(sec => sec.classList.remove('active'));
   document.getElementById(`${section}Section`)?.classList.add('active');
+  
+  // Scroll active TOC item into view if switching to contents
+  if (section === 'contents') {
+    setTimeout(() => {
+      const activeItem = tocListEl?.querySelector('.tocItem.active');
+      if (activeItem) {
+        activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 0);
+  }
 }
 
 function clearViewer() {

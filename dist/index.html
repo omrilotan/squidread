@@ -50,15 +50,16 @@
   <main class="layout">
     <aside class="panel hidden" id="panel">
       <div class="panelHeader">
-        <button id="swRefresh" class="ghost" title="Refresh service worker">🔄</button>
+        <img src="icon-32.png" alt="Squidread" class="panelIcon" width="32" height="32" />
         <h2 id="menuTitle">Squidread</h2>
         <button id="closePanel" class="ghost" title="Close menu">✕</button>
       </div>
       
       <nav class="panelNav">
-        <button id="navStyles" class="navBtn active">Styles</button>
-        <button id="navContents" class="navBtn">Contents</button>
-        <button id="navLibrary" class="navBtn">Library</button>
+        <button id="navStyles" class="navBtn active">🖌️</button>
+        <button id="navContents" class="navBtn">📄</button>
+        <button id="navLibrary" class="navBtn">📚</button>
+        <button id="navSettings" class="navBtn">⚙️</button>
       </nav>
 
       <div class="panelContent">
@@ -81,9 +82,6 @@
         </section>
 
         <section id="stylesSection" class="panelSection active">
-          <div class="cardHeader">
-            <h2>Styles</h2>
-          </div>
           <div class="stylesContent">
             <div class="stylesWindow"></div>
             <div class="fontSizeControl">
@@ -91,6 +89,15 @@
               <button id="fontSizeReset" class="fontSizeBtn" title="Reset font size">Reset</button>
               <button id="fontSizeIncrease" class="fontSizeBtn" title="Increase font size">+</button>
             </div>
+          </div>
+        </section>
+
+        <section id="settingsSection" class="panelSection">
+          <div class="settingsContent">
+            <p>Squidread EPUB reader</p>
+            <p>Version α (alpha): Work in progress</p>
+            <p><a id="swRefreshLink" href="#">🔄 Refresh service worker</a></p>
+            <p><a href="https://github.com/omrilotan/squidread" target="_blank" rel="noopener noreferrer">Source @ GitHub</a></p>
           </div>
         </section>
       </div>
