@@ -18,6 +18,8 @@ const clockEl = document.getElementById('clock');
 const chapterInfoEl = document.getElementById('chapterInfo');
 const progressPercentEl = document.getElementById('progressPercent');
 const menuTitleEl = document.getElementById('menuTitle');
+const librarySectionEl = document.getElementById('librarySection');
+const viewerEmptyStateEl = document.getElementById('viewerEmptyState');
 
 // --- Logging utility --------------------------------------------------------
 const LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
@@ -163,6 +165,23 @@ function wireEvents() {
     filePicker.value = '';
   });
 
+  librarySectionEl?.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'copy';
+    }
+  });
+
+  librarySectionEl?.addEventListener('drop', async (event) => {
+    event.preventDefault();
+    const file = getDroppedEpubFile(event.dataTransfer);
+    if (!file) {
+      showToast('Drop an EPUB file');
+      return;
+    }
+    await handleLocalFile(file);
+  });
+
   libraryEl.addEventListener('click', async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
@@ -246,6 +265,51 @@ function wireEvents() {
     persistCurrentLocation();
   });
 
+  window.addEventListener('keydown', (event) => {
+    if (event.defaultPrevented) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (isEditableTarget(event.target)) return;
+
+    if (event.key === 'm' || event.key === 'M') {
+      event.preventDefault();
+      openPanel();
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      if (!panelEl.classList.contains('hidden')) {
+        event.preventDefault();
+        closePanel();
+      }
+      return;
+    }
+
+    if (event.key === 'Tab' && !panelEl.classList.contains('hidden')) {
+      event.preventDefault();
+      cyclePanelSection(event.shiftKey ? -1 : 1);
+      return;
+    }
+
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      if (isRTL) {
+        rendition?.prev();
+      } else {
+        rendition?.next();
+      }
+      return;
+    }
+
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      if (isRTL) {
+        rendition?.next();
+      } else {
+        rendition?.prev();
+      }
+    }
+  });
+
   // Setup install modal handlers
   let deferredPrompt;
   const installModal = document.getElementById('installModal');
@@ -287,6 +351,29 @@ function wireEvents() {
     });
   }
 }
+
+function isEditableTarget(target) {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  const tag = target.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+}
+
+function getDroppedEpubFile(dataTransfer) {
+  const files = dataTransfer?.files;
+  if (!files?.length) return null;
+
+  for (const file of files) {
+    const isEpubMime = file.type === 'application/epub+zip';
+    const isEpubExtension = /\.epub$/i.test(file.name || '');
+    if (isEpubMime || isEpubExtension) {
+      return file;
+    }
+  }
+
+  return null;
+}
+
 async function handleLocalFile(file) {
   if (isProcessing) {
     log.debug('Ignoring selection while processing');
@@ -655,6 +742,7 @@ async function loadBook(id) {
 
   closePanel();
   clearViewer();
+  setViewerEmptyState(false);
   currentRecord = record;
   localStorage.setItem('lastOpenedBookId', id);
   
@@ -842,6 +930,7 @@ function switchPanelSection(section) {
 }
 
 function clearViewer() {
+  setViewerEmptyState(true);
   if (rendition) {
     rendition.destroy();
     rendition = null;
@@ -859,6 +948,31 @@ function clearViewer() {
     menuTitleEl.textContent = 'Squid Reader';
   }
   renderToc([]);
+}
+
+function setViewerEmptyState(visible) {
+  if (!viewerEmptyStateEl) return;
+  viewerEmptyStateEl.classList.toggle('hidden', !visible);
+}
+
+function openPanel() {
+  if (panelEl.classList.contains('hidden')) {
+    togglePanel();
+  }
+}
+
+function cyclePanelSection(direction) {
+  const sections = ['styles', 'contents', 'library', 'settings'];
+  const current = getActivePanelSection();
+  const currentIndex = Math.max(0, sections.indexOf(current));
+  const nextIndex = (currentIndex + direction + sections.length) % sections.length;
+  switchPanelSection(sections[nextIndex]);
+}
+
+function getActivePanelSection() {
+  const activeSection = document.querySelector('.panelSection.active');
+  if (!activeSection?.id) return 'styles';
+  return activeSection.id.replace(/Section$/, '');
 }
 
 function updatePosition(location) {

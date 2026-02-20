@@ -82,8 +82,13 @@
         </section>
 
         <section id="stylesSection" class="panelSection active">
-          <div class="stylesContent">
-            <div class="stylesWindow"></div>
+          <div class="stylesTop"></div>
+          <div class="stylesMiddle">
+            <div class="stylesSide stylesSideLeft"></div>
+            <div class="stylesCenter"></div>
+            <div class="stylesSide stylesSideRight"></div>
+          </div>
+          <div class="stylesBottom">
             <div class="fontSizeControl">
               <button id="fontSizeDecrease" class="fontSizeBtn" title="Decrease font size">−</button>
               <button id="fontSizeReset" class="fontSizeBtn" title="Reset font size">Reset</button>
@@ -105,6 +110,14 @@
 
     <section class="reader">
       <div id="viewer" class="viewer"></div>
+      <div id="viewerEmptyState" class="viewerEmptyState" aria-hidden="true">
+        <div class="viewerEmptyGraphic" aria-hidden="true">
+          <div class="viewerEmptyCircle viewerEmptyCircleOuter"></div>
+          <div class="viewerEmptyCircle viewerEmptyCircleInner"></div>
+          <div class="viewerEmptyBook">📖</div>
+        </div>
+        <div class="viewerEmptyText">No book selected</div>
+      </div>
       <div class="readerControls">
         <button id="prev" class="controlBtn prevBtn" title="Previous page">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
