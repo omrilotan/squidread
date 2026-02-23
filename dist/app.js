@@ -26,8 +26,8 @@ const LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
 function getInitialLogLevel() {
   const qp = new URLSearchParams(location.search).get('log');
   const stored = localStorage.getItem('squidreadLogLevel');
-  const level = (qp || stored || 'debug').toLowerCase();
-  return LOG_LEVELS[level] != null ? level : 'debug';
+  const level = (qp || stored || 'info').toLowerCase();
+  return LOG_LEVELS[level] != null ? level : 'info';
 }
 let currentLogLevel = getInitialLogLevel();
 function setLogLevel(level) {
