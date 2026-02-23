@@ -13,10 +13,13 @@ const progressFillEl = document.getElementById('progressFill');
 const progressLabelEl = document.getElementById('progressLabel');
 const clockEl = document.getElementById('clock');
 const chapterInfoEl = document.getElementById('chapterInfo');
+const chapterNumberEl = document.getElementById('chapterNumber');
 const progressPercentEl = document.getElementById('progressPercent');
 const menuTitleEl = document.getElementById('menuTitle');
 const librarySectionEl = document.getElementById('librarySection');
 const viewerEmptyStateEl = document.getElementById('viewerEmptyState');
+
+const wait = (ms) => new Promise((res) => setTimeout(res, ms));
 
 // --- Logging utility --------------------------------------------------------
 const LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
@@ -64,6 +67,8 @@ let isRTL = false;
 let fixedViewerHeight = window.innerHeight;
 let currentFontSize = 1.0; // Track font size multiplier from default (1em = 100%)
 let isTurningPage = false;
+let resizeTimer = null;
+let lastClockUpdate = 0;
 
 // Zone action mapping: row/col -> action ('prev', 'next', or 'menu')
 // Note: 'next' and 'prev' actions flip when the book direction is RTL (Right to Left)
@@ -284,7 +289,12 @@ function wireEvents() {
   });
 
   window.addEventListener('resize', () => {
-    resizeRendition();
+    // Throttle resize to avoid excessive reflows
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      resizeRendition();
+      resizeTimer = null;
+    }, 150);
   });
 
   document.addEventListener('visibilitychange', () => {
@@ -354,29 +364,30 @@ function wireZoneGridEvents() {
   if (!zoneCells.length || !actionButtons.length) return;
 
   function updateZoneDisplay() {
+    // Batch DOM updates to reduce reflows
     zoneCells.forEach((cell) => {
       const zone = parseInt(cell.dataset.zone, 10);
-      const row = Math.floor(zone / 3);
-      const col = zone % 3;
-      const action = getZoneAction(row, col);
-      
-      cell.classList.remove('active');
-      if (zone === selectedZoneForConfig) {
-        cell.classList.add('active');
-      }
+      cell.classList.toggle('active', zone === selectedZoneForConfig);
     });
 
-    actionButtons.forEach((btn) => {
-      btn.classList.remove('selected');
-      if (selectedZoneForConfig !== null) {
-        const row = Math.floor(selectedZoneForConfig / 3);
-        const col = selectedZoneForConfig % 3;
-        const action = getZoneAction(row, col);
-        if (btn.dataset.action === action) {
-          btn.classList.add('selected');
-        }
+    if (selectedZoneForConfig !== null) {
+      const row = Math.floor(selectedZoneForConfig / 3);
+      const col = selectedZoneForConfig % 3;
+      let action = getZoneAction(row, col);
+      
+      // Flip action for display if RTL to show physically correct direction
+      if (isRTL && (action === 'next' || action === 'prev')) {
+        action = action === 'next' ? 'prev' : 'next';
       }
-    });
+      
+      actionButtons.forEach((btn) => {
+        btn.classList.toggle('selected', btn.dataset.action === action);
+      });
+    } else {
+      actionButtons.forEach((btn) => {
+        btn.classList.remove('selected');
+      });
+    }
   }
 
   zoneCells.forEach((cell) => {
@@ -672,12 +683,16 @@ function renderToc(tocItems = []) {
   addItems(tocItems);
 }
 
-const wait = (ms) => new Promise((res) => setTimeout(res, ms));
+// Cache for injected iframes to avoid repeated DOM checks
+const injectedIframes = new WeakSet();
 
 function injectContentCSS() {
   // Minimal CSS - only prevent images from overflowing
   const iframes = document.querySelectorAll('.viewer iframe');
   iframes.forEach(iframe => {
+    // Skip if already processed to reduce overhead
+    if (injectedIframes.has(iframe)) return;
+    
     try {
       const doc = iframe.contentDocument || iframe.contentWindow?.document;
       if (!doc) return;
@@ -694,6 +709,9 @@ function injectContentCSS() {
         `;
         doc.head.appendChild(style);
       }
+      
+      // Mark as processed
+      injectedIframes.add(iframe);
       
       // Handle internal links
       if (!doc.body.dataset.squidreadLinksBound) {
@@ -890,14 +908,17 @@ async function loadBook(id) {
     // Wait a bit for the iframe to be created
     await wait(50);
     
+    // Single batch of layout operations
     resizeRendition();
-    setTimeout(() => {
-      resizeRendition();
-      lockIframeHeight();
-    }, 0);
-    setTimeout(() => {
-      lockIframeHeight();
-    }, 150);
+    
+    // Use Promise-based delays instead of multiple setTimeout for efficiency
+    await wait(0);
+    resizeRendition();
+    lockIframeHeight();
+    
+    await wait(150);
+    injectContentCSS();
+    
     log.info('Displayed rendition');
     
     // Restore saved font size preference
@@ -915,13 +936,9 @@ async function loadBook(id) {
       renderToc([]);
     }
     
-    // Inject CSS directly into the iframe to prevent scrolling
-    setTimeout(() => {
-      injectContentCSS();
-    }, 100);
-    setTimeout(() => {
-      injectContentCSS();
-    }, 300);
+    // Final CSS injection
+    await wait(150);
+    injectContentCSS();
   } catch (error) {
     log.error('Failed to display EPUB:', error);
   }
@@ -972,13 +989,21 @@ function applyFontSize() {
 }
 
 function switchPanelSection(section) {
-  // Update nav buttons
-  document.querySelectorAll('.navBtn').forEach(btn => btn.classList.remove('active'));
-  document.getElementById(`nav${section.charAt(0).toUpperCase() + section.slice(1)}`)?.classList.add('active');
+  // Use CSS class toggling to reduce reflows
+  const navBtnId = `nav${section.charAt(0).toUpperCase() + section.slice(1)}`;
+  const panelId = `${section}Section`;
+  const navBtn = document.getElementById(navBtnId);
+  const panel = document.getElementById(panelId);
   
-  // Update sections
-  document.querySelectorAll('.panelSection').forEach(sec => sec.classList.remove('active'));
-  document.getElementById(`${section}Section`)?.classList.add('active');
+  if (!navBtn || !panel) return;
+  
+  // Remove active from all, toggle on current (batch updates)
+  document.querySelectorAll('.navBtn').forEach(btn => {
+    btn.classList.toggle('active', btn === navBtn);
+  });
+  document.querySelectorAll('.panelSection').forEach(sec => {
+    sec.classList.toggle('active', sec === panel);
+  });
   
   // Scroll active TOC item into view if switching to contents
   if (section === 'contents') {
@@ -1006,6 +1031,7 @@ function clearViewer() {
   viewerEl.innerHTML = '';
   progressPercentEl.textContent = '-';
   chapterInfoEl.textContent = '-';
+  if (chapterNumberEl) chapterNumberEl.textContent = '-';
   if (menuTitleEl) {
     menuTitleEl.textContent = 'Squid Reader';
   }
@@ -1092,19 +1118,25 @@ function handleViewerZoneClick(event, rect) {
 
   const col = getZoneIndex(x, rect.width);
   const row = getZoneIndex(y, rect.height);
-  const action = getZoneAction(row, col);
+  let action = getZoneAction(row, col);
   log.debug('Viewer zone click:', { x, y, col, row, action });
   if (!action) return;
 
-  if (action === 'menu') {
+  // Flip action for execution if RTL
+  let effectiveAction = action;
+  if (isRTL && (action === 'next' || action === 'prev')) {
+    effectiveAction = action === 'next' ? 'prev' : 'next';
+  }
+
+  if (effectiveAction === 'menu') {
     openPanel();
     return;
   }
-  if (action === 'next') {
+  if (effectiveAction === 'next') {
     goNextPage();
     return;
   }
-  if (action === 'prev') {
+  if (effectiveAction === 'prev') {
     goPrevPage();
   }
 }
@@ -1176,9 +1208,13 @@ function updatePosition(location) {
 }
 
 function updateClock() {
-  const now = new Date();
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
+  // Only update if minute has changed to reduce DOM writes
+  const now = Date.now();
+  if (lastClockUpdate && now - lastClockUpdate < 60000) return;
+  lastClockUpdate = now;
+  const date = new Date();
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
   if (clockEl) clockEl.textContent = `${hours}:${minutes}`;
 }
 
@@ -1196,22 +1232,43 @@ function updateChapterInfo(location) {
     // Try to find chapter name from TOC and highlight it
     let chapterName = '';
     let activeHref = null;
+    let currentChapterNum = '';
+    let totalChapters = 0;
+    
     if (book?.navigation?.toc) {
-      const findInToc = (items) => {
+      // Count only TOP-LEVEL chapters
+      totalChapters = book.navigation.toc.filter(item => item.href).length;
+      
+      // Find current chapter with hierarchical numbering
+      const findInTocWithNumbers = (items, parentNum = '') => {
+        let chapterCount = 0;
         for (const item of items) {
-          if (item.href && section.href && section.href.includes(item.href.split('#')[0])) {
-            activeHref = item.href;
-            return item.label || item.title;
-          }
-          if (item.subitems) {
-            const found = findInToc(item.subitems);
-            if (found) return found;
+          if (item.href) {
+            chapterCount++;
+            const currentNum = parentNum ? `${parentNum}.${chapterCount}` : `${chapterCount}`;
+            
+            if (section.href && section.href.includes(item.href.split('#')[0])) {
+              activeHref = item.href;
+              return {
+                name: item.label || item.title,
+                number: currentNum
+              };
+            }
+            
+            if (item.subitems) {
+              const found = findInTocWithNumbers(item.subitems, currentNum);
+              if (found) return found;
+            }
           }
         }
         return null;
       };
-      const found = findInToc(book.navigation.toc);
-      if (found) chapterName = found;
+      
+      const found = findInTocWithNumbers(book.navigation.toc);
+      if (found) {
+        chapterName = found.name;
+        currentChapterNum = found.number;
+      }
     }
     
     // Update active TOC item
@@ -1227,12 +1284,27 @@ function updateChapterInfo(location) {
       }
     }
     
-    // Calculate page within section
+    // Build chapter info display
+    const parts = [];
+    
+    // Add chapter name
+    if (chapterName) {
+      parts.push(chapterName);
+    }
+    
+    // Add page within chapter (no prefix)
     const displayed = rendition?.location?.start?.displayed;
     if (displayed) {
-      chapterInfoEl.textContent = [chapterName, `${displayed.page}/${displayed.total}`].filter(Boolean).join(' • ');
-    } else {
-      chapterInfoEl.textContent = chapterName || '•';
+      parts.push(`${displayed.page}/${displayed.total}`);
+    }
+    
+    chapterInfoEl.textContent = parts.filter(Boolean).join(' • ') || '•';
+    
+    // Update chapter number in footer right (no prefix)
+    if (chapterNumberEl && currentChapterNum && totalChapters > 0) {
+      chapterNumberEl.textContent = `${currentChapterNum}/${totalChapters}`;
+    } else if (chapterNumberEl) {
+      chapterNumberEl.textContent = '-';
     }
   } catch (error) {
     log.debug('Failed to update chapter info:', error);
