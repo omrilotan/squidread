@@ -101,6 +101,31 @@
           <div class="settingsContent">
             <p>Squidread EPUB reader</p>
             <p>Version α (alpha): Work in progress</p>
+            
+            <h3>Click Zone Actions</h3>
+            <div id="zoneGridContainer" class="zoneGridContainer">
+              <div class="zoneGrid">
+                <button class="zoneCell" data-zone="0" title="Top-Left">↖️</button>
+                <button class="zoneCell" data-zone="1" title="Top-Center">⬆️</button>
+                <button class="zoneCell" data-zone="2" title="Top-Right">↗️</button>
+                <button class="zoneCell" data-zone="3" title="Middle-Left">⬅️</button>
+                <button class="zoneCell" data-zone="4" title="Middle-Center">⊙</button>
+                <button class="zoneCell" data-zone="5" title="Middle-Right">➡️</button>
+                <button class="zoneCell" data-zone="6" title="Bottom-Left">↙️</button>
+                <button class="zoneCell" data-zone="7" title="Bottom-Center">⬇️</button>
+                <button class="zoneCell" data-zone="8" title="Bottom-Right">↘️</button>
+              </div>
+              <div class="zoneInfo">
+                <p id="zoneActionLabel">Select a zone to configure</p>
+                <div class="zoneActionButtons">
+                  <button class="actionButton" data-action="prev">← Previous</button>
+                  <button class="actionButton" data-action="menu">☰ Menu</button>
+                  <button class="actionButton" data-action="next">Next →</button>
+                </div>
+              </div>
+              <p style="font-size: 0.85rem; color: var(--muted); margin: 8px 0 0 0;">📝 For right-to-left (RTL) books, "next" and "previous" actions are swapped.</p>
+            </div>
+            
             <p><a id="swRefreshLink" href="#">🔄 Refresh service worker</a></p>
             <p><a href="https://github.com/omrilotan/squidread" target="_blank" rel="noopener noreferrer">Source @ GitHub</a></p>
           </div>

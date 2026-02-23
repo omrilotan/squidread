@@ -65,6 +65,35 @@ let fixedViewerHeight = window.innerHeight;
 let currentFontSize = 1.0; // Track font size multiplier from default (1em = 100%)
 let isTurningPage = false;
 
+// Zone action mapping: row/col -> action ('prev', 'next', or 'menu')
+// Note: 'next' and 'prev' actions flip when the book direction is RTL (Right to Left)
+// For RTL books, users should configure zones accordingly (e.g., left zones for 'next', right zones for 'prev')
+let selectedZoneForConfig = null;
+function getDefaultZoneMap() {
+  return {
+    '0,0': 'prev', '0,1': 'menu', '0,2': 'next',
+    '1,0': 'prev', '1,1': 'menu', '1,2': 'next',
+    '2,0': 'prev', '2,1': 'menu', '2,2': 'next',
+  };
+}
+let zoneActionMap = getDefaultZoneMap();
+
+function loadZoneMapFromStorage() {
+  const stored = localStorage.getItem('squidreadZoneMap');
+  if (stored) {
+    try {
+      zoneActionMap = JSON.parse(stored);
+    } catch (e) {
+      log.warn('Failed to load zone map from storage', e);
+      zoneActionMap = getDefaultZoneMap();
+    }
+  }
+}
+
+function saveZoneMapToStorage() {
+  localStorage.setItem('squidreadZoneMap', JSON.stringify(zoneActionMap));
+}
+
 (async function init() {
   log.info('App init start');
   db = await openDB('squidread', 1, {
@@ -73,6 +102,7 @@ let isTurningPage = false;
     },
   });
 
+  loadZoneMapFromStorage();
   wireEvents();
   await renderLibrary();
   
@@ -311,6 +341,75 @@ function wireEvents() {
       log.info('App installed');
     });
   }
+
+  // Wire up zone grid controls
+  wireZoneGridEvents();
+}
+
+function wireZoneGridEvents() {
+  const zoneCells = document.querySelectorAll('.zoneCell');
+  const actionButtons = document.querySelectorAll('.actionButton');
+  const zoneActionLabel = document.getElementById('zoneActionLabel');
+
+  if (!zoneCells.length || !actionButtons.length) return;
+
+  function updateZoneDisplay() {
+    zoneCells.forEach((cell) => {
+      const zone = parseInt(cell.dataset.zone, 10);
+      const row = Math.floor(zone / 3);
+      const col = zone % 3;
+      const action = getZoneAction(row, col);
+      
+      cell.classList.remove('active');
+      if (zone === selectedZoneForConfig) {
+        cell.classList.add('active');
+      }
+    });
+
+    actionButtons.forEach((btn) => {
+      btn.classList.remove('selected');
+      if (selectedZoneForConfig !== null) {
+        const row = Math.floor(selectedZoneForConfig / 3);
+        const col = selectedZoneForConfig % 3;
+        const action = getZoneAction(row, col);
+        if (btn.dataset.action === action) {
+          btn.classList.add('selected');
+        }
+      }
+    });
+  }
+
+  zoneCells.forEach((cell) => {
+    cell.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const zone = parseInt(cell.dataset.zone, 10);
+      selectedZoneForConfig = zone;
+      zoneActionLabel.textContent = `Zone ${zone + 1} - Select an action`;
+      updateZoneDisplay();
+    });
+  });
+
+  actionButtons.forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (selectedZoneForConfig === null) {
+        showToast('Select a zone first');
+        return;
+      }
+      const row = Math.floor(selectedZoneForConfig / 3);
+      const col = selectedZoneForConfig % 3;
+      const action = btn.dataset.action;
+      const key = `${row},${col}`;
+      zoneActionMap[key] = action;
+      saveZoneMapToStorage();
+      updateZoneDisplay();
+      showToast(`Zone ${selectedZoneForConfig + 1} set to ${action}`);
+    });
+  });
+
+  updateZoneDisplay();
 }
 
 function isEditableTarget(target) {
@@ -1048,17 +1147,10 @@ function getZoneIndex(value, max) {
 }
 
 function getZoneAction(row, col) {
-  const rowKey = row === 0 ? 'top' : row === 1 ? 'middle' : 'bottom';
-  const colKey = col === 0 ? 'start' : col === 1 ? 'center' : 'end';
-  const leftAction = isRTL ? 'next' : 'prev';
-  const rightAction = isRTL ? 'prev' : 'next';
-  const actionByBlock = {
-    top: { start: leftAction, center: 'menu', end: rightAction },
-    middle: { start: leftAction, center: 'menu', end: rightAction },
-    bottom: { start: leftAction, center: 'menu', end: rightAction },
-  };
-  return actionByBlock[rowKey]?.[colKey] || null;
+  const key = `${row},${col}`;
+  return zoneActionMap[key] || null;
 }
+
 
 function getActivePanelSection() {
   const activeSection = document.querySelector('.panelSection.active');
