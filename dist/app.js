@@ -1,9 +1,6 @@
 import { openDB } from 'https://unpkg.com/idb?module';
 
 const libraryEl = document.getElementById('library');
-const prevBtn = document.getElementById('prev');
-const nextBtn = document.getElementById('next');
-const menuBtn = document.getElementById('menuBtn');
 const closePanelBtn = document.getElementById('closePanel');
 const swRefreshLink = document.getElementById('swRefreshLink');
 const panelEl = document.getElementById('panel');
@@ -26,8 +23,8 @@ const LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
 function getInitialLogLevel() {
   const qp = new URLSearchParams(location.search).get('log');
   const stored = localStorage.getItem('squidreadLogLevel');
-  const level = (qp || stored || 'info').toLowerCase();
-  return LOG_LEVELS[level] != null ? level : 'info';
+  const level = (qp || stored || 'debug').toLowerCase();
+  return LOG_LEVELS[level] != null ? level : 'debug';
 }
 let currentLogLevel = getInitialLogLevel();
 function setLogLevel(level) {
@@ -66,6 +63,7 @@ let isProcessing = false;
 let isRTL = false;
 let fixedViewerHeight = window.innerHeight;
 let currentFontSize = 1.0; // Track font size multiplier from default (1em = 100%)
+let isTurningPage = false;
 
 (async function init() {
   log.info('App init start');
@@ -129,9 +127,13 @@ let currentFontSize = 1.0; // Track font size multiplier from default (1em = 100
 
 function wireEvents() {
   log.debug('Wiring UI events');
-  prevBtn.addEventListener('click', () => rendition?.prev());
-  nextBtn.addEventListener('click', () => rendition?.next());
-  menuBtn.addEventListener('click', () => togglePanel());
+  const handleViewerPointer = (event) => {
+    const target = event.target;
+    if (!isDomElement(target)) return;
+    if (typeof target.closest === 'function' && target.closest('a[href]')) return;
+    handleViewerZoneClick(event, viewerEl.getBoundingClientRect());
+  };
+  viewerEl?.addEventListener('click', handleViewerPointer, true);
   closePanelBtn.addEventListener('click', () => closePanel());
   swRefreshLink?.addEventListener('click', async (event) => {
     event.preventDefault();
@@ -266,48 +268,7 @@ function wireEvents() {
   });
 
   window.addEventListener('keydown', (event) => {
-    if (event.defaultPrevented) return;
-    if (event.metaKey || event.ctrlKey || event.altKey) return;
-    if (isEditableTarget(event.target)) return;
-
-    if (event.key === 'm' || event.key === 'M') {
-      event.preventDefault();
-      openPanel();
-      return;
-    }
-
-    if (event.key === 'Escape') {
-      if (!panelEl.classList.contains('hidden')) {
-        event.preventDefault();
-        closePanel();
-      }
-      return;
-    }
-
-    if (event.key === 'Tab' && !panelEl.classList.contains('hidden')) {
-      event.preventDefault();
-      cyclePanelSection(event.shiftKey ? -1 : 1);
-      return;
-    }
-
-    if (event.key === 'ArrowRight') {
-      event.preventDefault();
-      if (isRTL) {
-        rendition?.prev();
-      } else {
-        rendition?.next();
-      }
-      return;
-    }
-
-    if (event.key === 'ArrowLeft') {
-      event.preventDefault();
-      if (isRTL) {
-        rendition?.next();
-      } else {
-        rendition?.prev();
-      }
-    }
+    handleReaderKeydown(event);
   });
 
   // Setup install modal handlers
@@ -353,10 +314,14 @@ function wireEvents() {
 }
 
 function isEditableTarget(target) {
-  if (!(target instanceof HTMLElement)) return false;
+  if (!isDomElement(target)) return false;
   if (target.isContentEditable) return true;
   const tag = target.tagName;
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+}
+
+function isDomElement(target) {
+  return !!target && target.nodeType === 1;
 }
 
 function getDroppedEpubFile(dataTransfer) {
@@ -618,65 +583,70 @@ function injectContentCSS() {
       const doc = iframe.contentDocument || iframe.contentWindow?.document;
       if (!doc) return;
       
-      // Check if already injected
-      if (doc.querySelector('#squidread-content-styles')) return;
-      
-      const style = doc.createElement('style');
-      style.id = 'squidread-content-styles';
-      style.textContent = `
-        img, svg, video, canvas, iframe {
-          max-width: 100% !important;
-          height: auto !important;
-        }
-      `;
-      doc.head.appendChild(style);
+      // Inject once per iframe document
+      if (!doc.querySelector('#squidread-content-styles')) {
+        const style = doc.createElement('style');
+        style.id = 'squidread-content-styles';
+        style.textContent = `
+          img, svg, video, canvas, iframe {
+            max-width: 100% !important;
+            height: auto !important;
+          }
+        `;
+        doc.head.appendChild(style);
+      }
       
       // Handle internal links
-      const links = doc.querySelectorAll('a[href]');
-      links.forEach(link => {
-        link.addEventListener('click', async (e) => {
-          const href = link.getAttribute('href');
-          if (!href || href.startsWith('http')) return; // Skip external links
-          
-          e.preventDefault();
-          
-          try {
-            // Try direct navigation first
-            await rendition.display(href);
-          } catch (error) {
-            log.debug('Direct link navigation failed, trying spine match:', href, error);
+      if (!doc.body.dataset.squidreadLinksBound) {
+        doc.body.dataset.squidreadLinksBound = '1';
+        const links = doc.querySelectorAll('a[href]');
+        links.forEach(link => {
+          link.addEventListener('click', async (e) => {
+            const href = link.getAttribute('href');
+            if (!href || href.startsWith('http')) return; // Skip external links
             
-            // Fallback: search spine by href
-            const baseHref = href.split('#')[0];
-            let targetSpine = null;
+            e.preventDefault();
             
-            if (book?.spine) {
-              for (let i = 0; i < book.spine.length; i++) {
-                const spineItem = book.spine.get(i);
-                if (spineItem?.href && spineItem.href.includes(baseHref)) {
-                  targetSpine = spineItem;
-                  break;
+            try {
+              // Try direct navigation first
+              await rendition.display(href);
+            } catch (error) {
+              log.debug('Direct link navigation failed, trying spine match:', href, error);
+              
+              // Fallback: search spine by href
+              const baseHref = href.split('#')[0];
+              let targetSpine = null;
+              
+              if (book?.spine) {
+                for (let i = 0; i < book.spine.length; i++) {
+                  const spineItem = book.spine.get(i);
+                  if (spineItem?.href && spineItem.href.includes(baseHref)) {
+                    targetSpine = spineItem;
+                    break;
+                  }
+                }
+              }
+              
+              if (targetSpine) {
+                // If there's an anchor, keep it
+                const anchor = href.includes('#') ? href.split('#')[1] : null;
+                if (anchor) {
+                  await rendition.display(targetSpine);
+                  // Try to scroll to anchor after display
+                  setTimeout(() => {
+                    const targetEl = doc.querySelector(`#${anchor}, [name="${anchor}"]`);
+                    if (targetEl) targetEl.scrollIntoView();
+                  }, 100);
+                } else {
+                  await rendition.display(targetSpine);
                 }
               }
             }
-            
-            if (targetSpine) {
-              // If there's an anchor, keep it
-              const anchor = href.includes('#') ? href.split('#')[1] : null;
-              if (anchor) {
-                await rendition.display(targetSpine);
-                // Try to scroll to anchor after display
-                setTimeout(() => {
-                  const targetEl = doc.querySelector(`#${anchor}, [name="${anchor}"]`);
-                  if (targetEl) targetEl.scrollIntoView();
-                }, 100);
-              } else {
-                await rendition.display(targetSpine);
-              }
-            }
-          }
+          });
         });
-      });
+      }
+
+      // Click/keydown handlers are attached via rendition content hooks.
     } catch (e) {
       log.debug('Could not inject CSS into iframe:', e);
     }
@@ -777,29 +747,6 @@ async function loadBook(id) {
   // Set TOC direction
   tocListEl.dir = isRTL ? 'rtl' : 'ltr';
   
-  // Switch button positions for RTL books
-  if (isRTL) {
-    log.debug('Book is RTL - swapping button positions');
-    // For RTL: Next on left (0), Menu in middle (1), Prev on right (2)
-    prevBtn.style.left = 'auto';
-    prevBtn.style.right = '0';
-    prevBtn.style.width = '33.33%';
-    
-    nextBtn.style.left = '0';
-    nextBtn.style.right = 'auto';
-    nextBtn.style.width = '33.33%';
-  } else {
-    log.debug('Book is LTR - standard button positions');
-    // For LTR: Prev on left (0), Menu in middle (1), Next on right (2)
-    prevBtn.style.left = '0';
-    prevBtn.style.right = 'auto';
-    prevBtn.style.width = '33.33%';
-    
-    nextBtn.style.left = 'auto';
-    nextBtn.style.right = '0';
-    nextBtn.style.width = '33.33%';
-  }
-  
   rendition = book.renderTo('viewer', {
     width: '100%',
     height: '100%',
@@ -807,8 +754,24 @@ async function loadBook(id) {
     allowScriptedContent: true,
   });
 
+  rendition.hooks.content.register((contents) => {
+    try {
+      const doc = contents?.document;
+      if (!doc?.body) return;
+
+      if (!doc.body.dataset.squidreadContentHooksBound) {
+        doc.body.dataset.squidreadContentHooksBound = '1';
+        doc.addEventListener('click', handleRenditionContentPointer, true);
+        doc.addEventListener('keydown', handleReaderKeydown);
+      }
+    } catch (error) {
+      log.debug('Failed to bind rendition content hooks:', error);
+    }
+  });
+
   rendition.on('relocated', async (location) => {
     log.debug('Relocated:', location?.start?.cfi);
+    isTurningPage = false;
     lockIframeHeight();
     injectContentCSS();
     updatePosition(location);
@@ -967,6 +930,134 @@ function cyclePanelSection(direction) {
   const currentIndex = Math.max(0, sections.indexOf(current));
   const nextIndex = (currentIndex + direction + sections.length) % sections.length;
   switchPanelSection(sections[nextIndex]);
+}
+
+function handleReaderKeydown(event) {
+  if (event.defaultPrevented) return;
+  if (event.metaKey || event.ctrlKey || event.altKey) return;
+  if (isEditableTarget(event.target)) return;
+
+  if (event.key === 'm' || event.key === 'M') {
+    event.preventDefault();
+    openPanel();
+    return;
+  }
+
+  if (event.key === 'r' || event.key === 'R') {
+    event.preventDefault();
+    refreshServiceWorker();
+    return;
+  }
+
+  if (event.key === 'Escape') {
+    if (!panelEl.classList.contains('hidden')) {
+      event.preventDefault();
+      closePanel();
+    }
+    return;
+  }
+
+  if (event.key === 'Tab' && !panelEl.classList.contains('hidden')) {
+    event.preventDefault();
+    cyclePanelSection(event.shiftKey ? -1 : 1);
+    return;
+  }
+
+  if (event.key === 'ArrowRight') {
+    event.preventDefault();
+    if (isRTL) {
+      goPrevPage();
+    } else {
+      goNextPage();
+    }
+    return;
+  }
+
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault();
+    if (isRTL) {
+      goNextPage();
+    } else {
+      goPrevPage();
+    }
+  }
+}
+
+function handleViewerZoneClick(event, rect) {
+  if (!rect || rect.width <= 0 || rect.height <= 0) return;
+  const smallestX = Math.min(...[event.clientX, event.screenX, event.pageX].filter(Number.isFinite)) ?? event.clientX;
+  const x = smallestX;
+  const y = event.clientY;
+  log.debug('Viewer click at:', { x, y, rect, event });
+  if (x < 0 || y < 0 || x > rect.width || y > rect.height) return;
+
+  const col = getZoneIndex(x, rect.width);
+  const row = getZoneIndex(y, rect.height);
+  const action = getZoneAction(row, col);
+  log.debug('Viewer zone click:', { x, y, col, row, action });
+  if (!action) return;
+
+  if (action === 'menu') {
+    openPanel();
+    return;
+  }
+  if (action === 'next') {
+    goNextPage();
+    return;
+  }
+  if (action === 'prev') {
+    goPrevPage();
+  }
+}
+
+function goNextPage() {
+  if (!rendition || isTurningPage) return;
+  isTurningPage = true;
+  rendition.next().catch(() => {
+    isTurningPage = false;
+  });
+}
+
+function goPrevPage() {
+  if (!rendition || isTurningPage) return;
+  isTurningPage = true;
+  rendition.prev().catch(() => {
+    isTurningPage = false;
+  });
+}
+
+function handleRenditionContentPointer(event) {
+  const target = event.target;
+  if (!isDomElement(target)) return;
+  if (typeof target.closest === 'function' && target.closest('a[href]')) return;
+
+  event.preventDefault?.();
+  event.stopImmediatePropagation?.();
+  event.stopPropagation?.();
+
+  const doc = target.ownerDocument;
+  const bodyRect = doc?.body?.getBoundingClientRect?.();
+  if (!bodyRect || bodyRect.width <= 0 || bodyRect.height <= 0) return;
+
+  handleViewerZoneClick(event, bodyRect);
+}
+
+function getZoneIndex(value, max) {
+  const ratio = Math.max(0, Math.min(0.999999, value / max));
+  return Math.floor(ratio * 3);
+}
+
+function getZoneAction(row, col) {
+  const rowKey = row === 0 ? 'top' : row === 1 ? 'middle' : 'bottom';
+  const colKey = col === 0 ? 'start' : col === 1 ? 'center' : 'end';
+  const leftAction = isRTL ? 'next' : 'prev';
+  const rightAction = isRTL ? 'prev' : 'next';
+  const actionByBlock = {
+    top: { start: leftAction, center: 'menu', end: rightAction },
+    middle: { start: leftAction, center: 'menu', end: rightAction },
+    bottom: { start: leftAction, center: 'menu', end: rightAction },
+  };
+  return actionByBlock[rowKey]?.[colKey] || null;
 }
 
 function getActivePanelSection() {
