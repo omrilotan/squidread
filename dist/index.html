@@ -15,12 +15,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3/dist/epub.min.js"></script>
-  <link rel="apple-touch-icon" href="icon-192.png" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Squidread" />
 </head>
 <body>
   <!-- Inline progress indicator for reading/downloading/saving -->
@@ -101,6 +95,21 @@
           <div class="settingsContent">
             <p>Squidread EPUB reader</p>
             <p>Version α (alpha): Work in progress</p>
+
+            <h3>Reader Width Limit</h3>
+            <div class="viewerWidthControls">
+              <label for="viewerWidthMode" class="viewerWidthLabel">Mode</label>
+              <select id="viewerWidthMode" class="viewerWidthModeSelect" aria-label="Reader width limit mode">
+                <option value="none">No limit</option>
+                <option value="px">Number of pixels</option>
+                <option value="vw">% of window width (vw)</option>
+              </select>
+              <div class="viewerWidthValueRow">
+                <label for="viewerWidthValue" class="viewerWidthLabel">Value</label>
+                <input id="viewerWidthValue" class="viewerWidthValueInput" type="number" inputmode="decimal" min="10" step="1" />
+                <span id="viewerWidthUnit" class="viewerWidthUnit">px</span>
+              </div>
+            </div>
             
             <h3>Click Zone Actions</h3>
             <div id="zoneGridContainer" class="zoneGridContainer">

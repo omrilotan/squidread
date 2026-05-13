@@ -21,6 +21,49 @@ const viewerEmptyStateEl = document.getElementById('viewerEmptyState');
 
 const wait = (ms) => new Promise((res) => setTimeout(res, ms));
 
+// --- Lazy-load heavy reader deps -------------------------------------------
+// EPUB.js (+ JSZip) are large; loading them only when needed keeps startup fast.
+const EPUB_SCRIPT_URLS = [
+  'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',
+  'https://cdn.jsdelivr.net/npm/epubjs@0.3/dist/epub.min.js',
+];
+let epubDepsPromise = null;
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) {
+      if (existing.dataset.loaded === '1') return resolve();
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = () => {
+      script.dataset.loaded = '1';
+      resolve();
+    };
+    script.onerror = () => reject(new Error(`Failed to load ${src}`));
+    document.head.appendChild(script);
+  });
+}
+
+async function ensureEpubDepsLoaded() {
+  if (typeof window.ePub === 'function') return;
+  if (!epubDepsPromise) {
+    epubDepsPromise = (async () => {
+      for (const url of EPUB_SCRIPT_URLS) await loadScript(url);
+      if (typeof window.ePub !== 'function') {
+        throw new Error('EPUB deps loaded, but window.ePub is not available');
+      }
+    })();
+  }
+  await epubDepsPromise;
+}
+
 // --- Logging utility --------------------------------------------------------
 const LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
 function getInitialLogLevel() {
@@ -69,6 +112,8 @@ let currentFontSize = 1.0; // Track font size multiplier from default (1em = 100
 let isTurningPage = false;
 let resizeTimer = null;
 let lastClockUpdate = 0;
+let viewerWidthMode = 'none';
+let viewerWidthValue = 900;
 
 // Zone action mapping: row/col -> action ('prev', 'next', or 'menu')
 // Note: 'next' and 'prev' actions flip when the book direction is RTL (Right to Left)
@@ -99,6 +144,118 @@ function saveZoneMapToStorage() {
   localStorage.setItem('squidreadZoneMap', JSON.stringify(zoneActionMap));
 }
 
+function isValidViewerWidthMode(mode) {
+  return mode === 'none' || mode === 'px' || mode === 'vw';
+}
+
+function getViewerWidthRange(mode) {
+  if (mode === 'px') {
+    return { min: 320, max: 4000, step: 1, unit: 'px' };
+  }
+  return { min: 10, max: 100, step: 1, unit: 'vw' };
+}
+
+function clampViewerWidthValue(mode, value) {
+  const { min, max } = getViewerWidthRange(mode);
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, value));
+}
+
+function getViewerWidthCssValue() {
+  if (viewerWidthMode === 'none') {
+    return '100%';
+  }
+  const value = clampViewerWidthValue(viewerWidthMode, viewerWidthValue);
+  return viewerWidthMode === 'px' ? `${value}px` : `${value}vw`;
+}
+
+function applyViewerWidthLimit() {
+  const widthValue = getViewerWidthCssValue();
+  if (viewerEl) {
+    viewerEl.style.maxWidth = widthValue;
+  }
+  queueViewerRedraw();
+}
+
+function saveViewerWidthSettings() {
+  localStorage.setItem('squidreadViewerWidthMode', viewerWidthMode);
+  localStorage.setItem('squidreadViewerWidthValue', String(viewerWidthValue));
+}
+
+function loadViewerWidthSettings() {
+  const storedMode = localStorage.getItem('squidreadViewerWidthMode');
+  const storedValueRaw = localStorage.getItem('squidreadViewerWidthValue');
+  if (isValidViewerWidthMode(storedMode)) {
+    viewerWidthMode = storedMode;
+  }
+  const parsedValue = Number.parseFloat(storedValueRaw || '');
+  if (Number.isFinite(parsedValue)) {
+    viewerWidthValue = parsedValue;
+  }
+  if (viewerWidthMode !== 'none') {
+    viewerWidthValue = clampViewerWidthValue(viewerWidthMode, viewerWidthValue);
+  }
+}
+
+function syncViewerWidthControls() {
+  const modeSelect = document.getElementById('viewerWidthMode');
+  const valueInput = document.getElementById('viewerWidthValue');
+  const unitEl = document.getElementById('viewerWidthUnit');
+  if (!modeSelect || !valueInput || !unitEl) return;
+
+  modeSelect.value = viewerWidthMode;
+  const disabled = viewerWidthMode === 'none';
+  valueInput.disabled = disabled;
+
+  if (!disabled) {
+    const { min, max, step, unit } = getViewerWidthRange(viewerWidthMode);
+    valueInput.min = String(min);
+    valueInput.max = String(max);
+    valueInput.step = String(step);
+    valueInput.value = String(clampViewerWidthValue(viewerWidthMode, viewerWidthValue));
+    unitEl.textContent = unit;
+  } else {
+    valueInput.value = '';
+    unitEl.textContent = '-';
+  }
+}
+
+function wireViewerWidthControls() {
+  const modeSelect = document.getElementById('viewerWidthMode');
+  const valueInput = document.getElementById('viewerWidthValue');
+  if (!modeSelect || !valueInput) return;
+
+  syncViewerWidthControls();
+
+  modeSelect.addEventListener('change', () => {
+    const nextMode = modeSelect.value;
+    if (!isValidViewerWidthMode(nextMode)) return;
+    viewerWidthMode = nextMode;
+    if (viewerWidthMode !== 'none') {
+      viewerWidthValue = clampViewerWidthValue(viewerWidthMode, viewerWidthValue);
+    }
+    applyViewerWidthLimit();
+    saveViewerWidthSettings();
+    syncViewerWidthControls();
+  });
+
+  const applyValueFromInput = () => {
+    if (viewerWidthMode === 'none') return;
+    const parsed = Number.parseFloat(valueInput.value);
+    if (!Number.isFinite(parsed)) {
+      syncViewerWidthControls();
+      return;
+    }
+    viewerWidthValue = clampViewerWidthValue(viewerWidthMode, parsed);
+    applyViewerWidthLimit();
+    saveViewerWidthSettings();
+    syncViewerWidthControls();
+  };
+
+  valueInput.addEventListener('change', applyValueFromInput);
+  valueInput.addEventListener('blur', applyValueFromInput);
+}
+
 (async function init() {
   log.info('App init start');
   db = await openDB('squidread', 1, {
@@ -108,6 +265,8 @@ function saveZoneMapToStorage() {
   });
 
   loadZoneMapFromStorage();
+  loadViewerWidthSettings();
+  applyViewerWidthLimit();
   wireEvents();
   await renderLibrary();
   
@@ -261,18 +420,7 @@ function wireEvents() {
       closePanel();
     } catch (error) {
       // If direct display fails, try stripping fragment and matching in spine
-      const baseHref = href.split('#')[0];
-      let targetSpine = null;
-      
-      if (book?.spine) {
-        for (let i = 0; i < book.spine.length; i++) {
-          const spineItem = book.spine.get(i);
-          if (spineItem?.href && spineItem.href.includes(baseHref)) {
-            targetSpine = spineItem;
-            break;
-          }
-        }
-      }
+      const targetSpine = findSpineItemByHref(href);
       
       if (targetSpine) {
         await rendition.display(targetSpine);
@@ -289,12 +437,7 @@ function wireEvents() {
   });
 
   window.addEventListener('resize', () => {
-    // Throttle resize to avoid excessive reflows
-    if (resizeTimer) clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-      resizeRendition();
-      resizeTimer = null;
-    }, 150);
+    queueViewerRedraw();
   });
 
   document.addEventListener('visibilitychange', () => {
@@ -354,6 +497,7 @@ function wireEvents() {
 
   // Wire up zone grid controls
   wireZoneGridEvents();
+  wireViewerWidthControls();
 }
 
 function wireZoneGridEvents() {
@@ -434,6 +578,20 @@ function isDomElement(target) {
   return !!target && target.nodeType === 1;
 }
 
+function findSpineItemByHref(href) {
+  const baseHref = (href || '').split('#')[0];
+  if (!baseHref || !book?.spine) return null;
+
+  for (let i = 0; i < book.spine.length; i++) {
+    const spineItem = book.spine.get(i);
+    if (spineItem?.href && spineItem.href.includes(baseHref)) {
+      return spineItem;
+    }
+  }
+
+  return null;
+}
+
 function getDroppedEpubFile(dataTransfer) {
   const files = dataTransfer?.files;
   if (!files?.length) return null;
@@ -502,6 +660,7 @@ async function saveBook(name, blob) {
   let coverDataUrl = null;
   
   try {
+    await ensureEpubDepsLoaded();
     const tempBook = await ePub(blob).opened;
     title = tempBook.packaging?.metadata?.title || title;
     
@@ -555,38 +714,10 @@ async function renderLibrary() {
   const books = await db.getAll('books');
   books.sort((a, b) => (b.lastOpened || b.createdAt) - (a.lastOpened || a.createdAt));
   
-  // Clear library but keep the Add EPUB button
+  // Clear library but keep the Add EPUB button (and its wired handlers)
   const addButton = libraryEl.querySelector('.libraryAddItem');
   libraryEl.innerHTML = '';
-  
-  // Always restore the Add EPUB button as the first item
-  if (addButton) {
-    libraryEl.appendChild(addButton);
-  } else {
-    // If for some reason it doesn't exist, recreate it
-    const li = document.createElement('li');
-    li.className = 'libraryAddItem';
-    li.innerHTML = `
-      <button id="addEpubBtn" class="addEpubButton">
-        <span class="addEpubPlus">+</span>
-        <span class="addEpubText">Add EPUB</span>
-      </button>
-      <input type="file" id="filePicker" accept="application/epub+zip,.epub" class="hidden" />
-    `;
-    libraryEl.appendChild(li);
-    // Re-wire the button
-    const newAddBtn = libraryEl.querySelector('#addEpubBtn');
-    const newFilePicker = libraryEl.querySelector('#filePicker');
-    newAddBtn?.addEventListener('click', () => {
-      newFilePicker?.click();
-    });
-    newFilePicker?.addEventListener('change', async () => {
-      const file = newFilePicker?.files?.[0];
-      if (!file) return;
-      await handleLocalFile(file);
-      newFilePicker.value = '';
-    });
-  }
+  if (addButton) libraryEl.appendChild(addButton);
   
   if (!books.length) {
     return;
@@ -731,18 +862,7 @@ function injectContentCSS() {
               log.debug('Direct link navigation failed, trying spine match:', href, error);
               
               // Fallback: search spine by href
-              const baseHref = href.split('#')[0];
-              let targetSpine = null;
-              
-              if (book?.spine) {
-                for (let i = 0; i < book.spine.length; i++) {
-                  const spineItem = book.spine.get(i);
-                  if (spineItem?.href && spineItem.href.includes(baseHref)) {
-                    targetSpine = spineItem;
-                    break;
-                  }
-                }
-              }
+            const targetSpine = findSpineItemByHref(href);
               
               if (targetSpine) {
                 // If there's an anchor, keep it
@@ -793,6 +913,16 @@ function resizeRendition() {
     fixedViewerHeight = height;
     rendition.resize(width, height);
   }
+}
+
+function queueViewerRedraw() {
+  // Debounce resize-driven redraws to avoid excessive layout work.
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    resizeRendition();
+    lockIframeHeight();
+    resizeTimer = null;
+  }, 150);
 }
 
 function lockIframeHeight() {
@@ -846,6 +976,7 @@ async function loadBook(id) {
   }
 
   try {
+    await ensureEpubDepsLoaded();
     log.info('Creating ePub instance from blob');
     book = ePub(record.blob);
     log.info('Waiting for book to open');

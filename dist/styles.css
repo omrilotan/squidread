@@ -259,6 +259,7 @@ body {
   width: 100%;
   height: 100%;
   max-width: 100%;
+  margin: 0 auto;
 }
 
 .viewer iframe {
@@ -1004,4 +1005,53 @@ button.ghost {
 
 .settingsContent h3:first-child {
   margin-top: 0;
+}
+
+.viewerWidthControls {
+  display: grid;
+  gap: 8px;
+  max-width: 320px;
+  margin-bottom: 16px;
+}
+
+.viewerWidthLabel {
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.viewerWidthModeSelect,
+.viewerWidthValueInput {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 0.95rem;
+}
+
+.viewerWidthModeSelect:focus,
+.viewerWidthValueInput:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.viewerWidthValueRow {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.viewerWidthValueRow .viewerWidthLabel {
+  grid-column: 1 / -1;
+}
+
+.viewerWidthUnit {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  min-width: 2ch;
+  text-align: end;
 }
