@@ -50,7 +50,7 @@
       </div>
       
       <nav class="panelNav">
-        <button id="navStyles" class="navBtn active">🖌️</button>
+        <button id="navStyles" class="navBtn active">🔤</button>
         <button id="navContents" class="navBtn">📄</button>
         <button id="navLibrary" class="navBtn">📚</button>
         <button id="navSettings" class="navBtn">⚙️</button>
@@ -96,18 +96,65 @@
             <p>Squidread EPUB reader</p>
             <p>Version α (alpha): Work in progress</p>
 
-            <h3>Reader Width Limit</h3>
-            <div class="viewerWidthControls">
-              <label for="viewerWidthMode" class="viewerWidthLabel">Mode</label>
-              <select id="viewerWidthMode" class="viewerWidthModeSelect" aria-label="Reader width limit mode">
-                <option value="none">No limit</option>
-                <option value="px">Number of pixels</option>
-                <option value="vw">% of window width (vw)</option>
-              </select>
-              <div class="viewerWidthValueRow">
-                <label for="viewerWidthValue" class="viewerWidthLabel">Value</label>
-                <input id="viewerWidthValue" class="viewerWidthValueInput" type="number" inputmode="decimal" min="10" step="1" />
-                <span id="viewerWidthUnit" class="viewerWidthUnit">px</span>
+            <h3>Reader Aspect Ratio</h3>
+            <div class="aspectControlGroup">
+              <div class="viewerWidthLabel">Preset</div>
+              <div class="aspectButtonGrid" id="viewerAspectPreset" role="radiogroup" aria-label="Reader aspect ratio preset">
+                <button type="button" class="aspectButton" data-aspect-preset="fullscreen" aria-pressed="false">
+                  <svg class="aspectButtonIcon aspectButtonIconPreset" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                    <rect x="8" y="8" width="48" height="48" rx="10" ry="10" />
+                    <rect x="18" y="18" width="28" height="28" rx="6" ry="6" />
+                  </svg>
+                  <span class="aspectButtonText">Full-screen</span>
+                </button>
+                <button type="button" class="aspectButton" data-aspect-preset="16:9" aria-pressed="false">
+                  <svg class="aspectButtonIcon aspectButtonIconPreset" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                    <rect x="8" y="8" width="48" height="48" rx="10" ry="10" />
+                    <rect x="22" y="16" width="20" height="32" rx="5" ry="5" />
+                  </svg>
+                  <span class="aspectButtonText">16:9</span>
+                </button>
+                <button type="button" class="aspectButton" data-aspect-preset="4:3" aria-pressed="false">
+                  <svg class="aspectButtonIcon aspectButtonIconPreset" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                    <rect x="8" y="8" width="48" height="48" rx="10" ry="10" />
+                    <rect x="20" y="14" width="24" height="36" rx="5" ry="5" />
+                  </svg>
+                  <span class="aspectButtonText">4:3</span>
+                </button>
+                <button type="button" class="aspectButton" data-aspect-preset="1:1" aria-pressed="false">
+                  <svg class="aspectButtonIcon aspectButtonIconPreset" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                    <rect x="8" y="8" width="48" height="48" rx="10" ry="10" />
+                    <rect x="18" y="18" width="28" height="28" rx="5" ry="5" />
+                  </svg>
+                  <span class="aspectButtonText">1:1</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="aspectControlGroup">
+              <div class="viewerWidthLabel">Direction</div>
+              <div class="aspectButtonGrid aspectButtonGridDirection" id="viewerAspectDirection" role="radiogroup" aria-label="Reader aspect ratio direction">
+                <button type="button" class="aspectButton" data-aspect-direction="device" aria-pressed="false">
+                  <svg class="aspectButtonIcon aspectButtonIconDirection" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                    <rect x="8" y="8" width="48" height="48" rx="10" ry="10" />
+                    <rect x="21" y="20" width="22" height="22" rx="5" ry="5" />
+                  </svg>
+                  <span class="aspectButtonText">Device</span>
+                </button>
+                <button type="button" class="aspectButton" data-aspect-direction="portrait" aria-pressed="false">
+                  <svg class="aspectButtonIcon aspectButtonIconDirection" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                    <rect x="8" y="8" width="48" height="48" rx="10" ry="10" />
+                    <rect x="27" y="18" width="10" height="26" rx="4" ry="4" />
+                  </svg>
+                  <span class="aspectButtonText">Portrait</span>
+                </button>
+                <button type="button" class="aspectButton" data-aspect-direction="landscape" aria-pressed="false">
+                  <svg class="aspectButtonIcon aspectButtonIconDirection" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                    <rect x="8" y="8" width="48" height="48" rx="10" ry="10" />
+                    <rect x="18" y="27" width="26" height="10" rx="4" ry="4" />
+                  </svg>
+                  <span class="aspectButtonText">Landscape</span>
+                </button>
               </div>
             </div>
             

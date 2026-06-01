@@ -15,6 +15,7 @@
   --footer-height: 36px;
   --panel-background: rgba(255, 255, 255, 1);
   --viewer-bg: #fff;
+  --max-width-setting-box: 300px;
 }
 
 body {
@@ -217,6 +218,7 @@ body {
 
 .settingsContent {
   padding: 16px;
+  text-align: center;
 }
 
 .settingsContent p {
@@ -248,6 +250,7 @@ body {
   padding: 0 0 var(--footer-height) 0; /* Add bottom padding for footer */
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   width: 100vw;
   max-width: 100%;
   box-sizing: border-box;
@@ -260,6 +263,14 @@ body {
   height: 100%;
   max-width: 100%;
   margin: 0 auto;
+}
+
+.viewer.hasAspectRatio {
+  align-self: center;
+  width: min(100%, calc((100vh - var(--footer-height)) * var(--reader-aspect-ratio)));
+  height: auto;
+  aspect-ratio: var(--reader-aspect-ratio);
+  max-height: calc(100vh - var(--footer-height));
 }
 
 .viewer iframe {
@@ -908,14 +919,13 @@ button.ghost {
   }
 }
 .zoneGridContainer {
-  margin: 20px 0;
+  margin: 20px auto;
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.02);
-  width: 33.333%;
   aspect-ratio: 1;
-  max-width: 300px;
+  max-width: var(--max-width-setting-box);
 }
 
 .zoneGrid {
@@ -1014,6 +1024,13 @@ button.ghost {
   margin-bottom: 16px;
 }
 
+.aspectControlGroup {
+  display: grid;
+  gap: 8px;
+  margin: 0 auto 16px;
+  max-width: var(--max-width-setting-box);
+}
+
 .viewerWidthLabel {
   font-size: 0.9rem;
   color: var(--muted);
@@ -1054,4 +1071,83 @@ button.ghost {
   font-weight: 600;
   min-width: 2ch;
   text-align: end;
+}
+
+.aspectButtonGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.aspectButtonGridDirection {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.aspectButton {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  padding: 12px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  align-content: center;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.aspectButtonGrid:not(.aspectButtonGridDirection) .aspectButton {
+  min-height: 148px;
+}
+
+.aspectButtonGridDirection .aspectButton {
+  min-height: 122px;
+}
+
+.aspectButton:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+}
+
+.aspectButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.aspectButton:disabled:hover {
+  border-color: var(--border);
+}
+
+.aspectButton[aria-pressed="true"] {
+  border-color: var(--accent-strong);
+  background: rgba(125, 211, 252, 0.12);
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.25) inset;
+}
+
+.aspectButtonIcon {
+  display: block;
+  width: 58px;
+  height: 48px;
+  color: currentColor;
+  flex: none;
+}
+
+.aspectButtonIconDirection {
+  width: 60px;
+  height: 52px;
+}
+
+.aspectButtonIcon rect {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+}
+
+.aspectButtonText {
+  font-size: 0.85rem;
+  font-weight: 600;
 }

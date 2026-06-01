@@ -112,8 +112,15 @@ let currentFontSize = 1.0; // Track font size multiplier from default (1em = 100
 let isTurningPage = false;
 let resizeTimer = null;
 let lastClockUpdate = 0;
-let viewerWidthMode = 'none';
-let viewerWidthValue = 900;
+const READER_ASPECT_PRESETS = {
+  fullscreen: null,
+  '16:9': 16 / 9,
+  '4:3': 4 / 3,
+  '1:1': 1,
+};
+const READER_ASPECT_DIRECTIONS = new Set(['device', 'portrait', 'landscape']);
+let readerAspectPreset = 'fullscreen';
+let readerAspectDirection = 'device';
 
 // Zone action mapping: row/col -> action ('prev', 'next', or 'menu')
 // Note: 'next' and 'prev' actions flip when the book direction is RTL (Right to Left)
@@ -144,116 +151,121 @@ function saveZoneMapToStorage() {
   localStorage.setItem('squidreadZoneMap', JSON.stringify(zoneActionMap));
 }
 
-function isValidViewerWidthMode(mode) {
-  return mode === 'none' || mode === 'px' || mode === 'vw';
+function isValidReaderAspectPreset(preset) {
+  return Object.prototype.hasOwnProperty.call(READER_ASPECT_PRESETS, preset);
 }
 
-function getViewerWidthRange(mode) {
-  if (mode === 'px') {
-    return { min: 320, max: 4000, step: 1, unit: 'px' };
+function isValidReaderAspectDirection(direction) {
+  return READER_ASPECT_DIRECTIONS.has(direction);
+}
+
+function getEffectiveReaderAspectDirection() {
+  if (readerAspectDirection === 'device') {
+    return window.matchMedia('(orientation: portrait)').matches ? 'portrait' : 'landscape';
   }
-  return { min: 10, max: 100, step: 1, unit: 'vw' };
+  return readerAspectDirection;
 }
 
-function clampViewerWidthValue(mode, value) {
-  const { min, max } = getViewerWidthRange(mode);
-  if (!Number.isFinite(value)) return min;
-  return Math.max(min, Math.min(max, value));
-}
-
-function getViewerWidthCssValue() {
-  if (viewerWidthMode === 'none') {
-    return '100%';
+function getReaderAspectRatioValue() {
+  if (readerAspectPreset === 'fullscreen') {
+    return null;
   }
-  const value = clampViewerWidthValue(viewerWidthMode, viewerWidthValue);
-  return viewerWidthMode === 'px' ? `${value}px` : `${value}vw`;
+
+  const baseRatio = READER_ASPECT_PRESETS[readerAspectPreset];
+  if (!Number.isFinite(baseRatio)) {
+    return null;
+  }
+
+  return getEffectiveReaderAspectDirection() === 'portrait' ? 1 / baseRatio : baseRatio;
 }
 
-function applyViewerWidthLimit() {
-  const widthValue = getViewerWidthCssValue();
-  if (viewerEl) {
-    viewerEl.style.maxWidth = widthValue;
+function applyReaderAspectRatio() {
+  if (!viewerEl) return;
+
+  if (readerAspectPreset === 'fullscreen') {
+    viewerEl.style.removeProperty('--reader-aspect-ratio');
+    viewerEl.classList.remove('hasAspectRatio');
+    return;
   }
-  queueViewerRedraw();
+
+  const ratio = getReaderAspectRatioValue();
+  if (!ratio) return;
+
+  viewerEl.style.setProperty('--reader-aspect-ratio', String(ratio));
+  viewerEl.classList.add('hasAspectRatio');
 }
 
-function saveViewerWidthSettings() {
-  localStorage.setItem('squidreadViewerWidthMode', viewerWidthMode);
-  localStorage.setItem('squidreadViewerWidthValue', String(viewerWidthValue));
+function saveReaderAspectSettings() {
+  localStorage.setItem('squidreadReaderAspectPreset', readerAspectPreset);
+  localStorage.setItem('squidreadReaderAspectDirection', readerAspectDirection);
 }
 
-function loadViewerWidthSettings() {
-  const storedMode = localStorage.getItem('squidreadViewerWidthMode');
-  const storedValueRaw = localStorage.getItem('squidreadViewerWidthValue');
-  if (isValidViewerWidthMode(storedMode)) {
-    viewerWidthMode = storedMode;
-  }
-  const parsedValue = Number.parseFloat(storedValueRaw || '');
-  if (Number.isFinite(parsedValue)) {
-    viewerWidthValue = parsedValue;
-  }
-  if (viewerWidthMode !== 'none') {
-    viewerWidthValue = clampViewerWidthValue(viewerWidthMode, viewerWidthValue);
-  }
-}
+function loadReaderAspectSettings() {
+  const storedPreset = localStorage.getItem('squidreadReaderAspectPreset');
+  const storedDirection = localStorage.getItem('squidreadReaderAspectDirection');
 
-function syncViewerWidthControls() {
-  const modeSelect = document.getElementById('viewerWidthMode');
-  const valueInput = document.getElementById('viewerWidthValue');
-  const unitEl = document.getElementById('viewerWidthUnit');
-  if (!modeSelect || !valueInput || !unitEl) return;
+  if (isValidReaderAspectPreset(storedPreset)) {
+    readerAspectPreset = storedPreset;
+  }
 
-  modeSelect.value = viewerWidthMode;
-  const disabled = viewerWidthMode === 'none';
-  valueInput.disabled = disabled;
-
-  if (!disabled) {
-    const { min, max, step, unit } = getViewerWidthRange(viewerWidthMode);
-    valueInput.min = String(min);
-    valueInput.max = String(max);
-    valueInput.step = String(step);
-    valueInput.value = String(clampViewerWidthValue(viewerWidthMode, viewerWidthValue));
-    unitEl.textContent = unit;
-  } else {
-    valueInput.value = '';
-    unitEl.textContent = '-';
+  if (isValidReaderAspectDirection(storedDirection)) {
+    readerAspectDirection = storedDirection;
   }
 }
 
-function wireViewerWidthControls() {
-  const modeSelect = document.getElementById('viewerWidthMode');
-  const valueInput = document.getElementById('viewerWidthValue');
-  if (!modeSelect || !valueInput) return;
+function syncReaderAspectControls() {
+  const presetButtons = document.querySelectorAll('[data-aspect-preset]');
+  const directionButtons = document.querySelectorAll('[data-aspect-direction]');
+  if (!presetButtons.length || !directionButtons.length) return;
 
-  syncViewerWidthControls();
-
-  modeSelect.addEventListener('change', () => {
-    const nextMode = modeSelect.value;
-    if (!isValidViewerWidthMode(nextMode)) return;
-    viewerWidthMode = nextMode;
-    if (viewerWidthMode !== 'none') {
-      viewerWidthValue = clampViewerWidthValue(viewerWidthMode, viewerWidthValue);
-    }
-    applyViewerWidthLimit();
-    saveViewerWidthSettings();
-    syncViewerWidthControls();
+  presetButtons.forEach((button) => {
+    const pressed = button.dataset.aspectPreset === readerAspectPreset;
+    button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
   });
 
-  const applyValueFromInput = () => {
-    if (viewerWidthMode === 'none') return;
-    const parsed = Number.parseFloat(valueInput.value);
-    if (!Number.isFinite(parsed)) {
-      syncViewerWidthControls();
-      return;
-    }
-    viewerWidthValue = clampViewerWidthValue(viewerWidthMode, parsed);
-    applyViewerWidthLimit();
-    saveViewerWidthSettings();
-    syncViewerWidthControls();
-  };
+  const directionDisabled = readerAspectPreset === 'fullscreen';
+  directionButtons.forEach((button) => {
+    const pressed = button.dataset.aspectDirection === readerAspectDirection;
+    button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+    button.disabled = directionDisabled;
+  });
+}
 
-  valueInput.addEventListener('change', applyValueFromInput);
-  valueInput.addEventListener('blur', applyValueFromInput);
+function wireReaderAspectControls() {
+  const presetButtons = document.querySelectorAll('[data-aspect-preset]');
+  const directionButtons = document.querySelectorAll('[data-aspect-direction]');
+  if (!presetButtons.length || !directionButtons.length) return;
+
+  syncReaderAspectControls();
+
+  presetButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const nextPreset = button.dataset.aspectPreset;
+      if (!isValidReaderAspectPreset(nextPreset)) return;
+      readerAspectPreset = nextPreset;
+      syncReaderAspectControls();
+      applyReaderAspectRatio();
+      queueViewerRedraw();
+      saveReaderAspectSettings();
+    });
+  });
+
+  directionButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      if (readerAspectPreset === 'fullscreen') {
+        syncReaderAspectControls();
+        return;
+      }
+
+      const nextDirection = button.dataset.aspectDirection;
+      if (!isValidReaderAspectDirection(nextDirection)) return;
+      readerAspectDirection = nextDirection;
+      syncReaderAspectControls();
+      applyReaderAspectRatio();
+      queueViewerRedraw();
+      saveReaderAspectSettings();
+    });
+  });
 }
 
 (async function init() {
@@ -265,8 +277,8 @@ function wireViewerWidthControls() {
   });
 
   loadZoneMapFromStorage();
-  loadViewerWidthSettings();
-  applyViewerWidthLimit();
+  loadReaderAspectSettings();
+  applyReaderAspectRatio();
   wireEvents();
   await renderLibrary();
   
@@ -437,6 +449,7 @@ function wireEvents() {
   });
 
   window.addEventListener('resize', () => {
+    applyReaderAspectRatio();
     queueViewerRedraw();
   });
 
@@ -497,7 +510,7 @@ function wireEvents() {
 
   // Wire up zone grid controls
   wireZoneGridEvents();
-  wireViewerWidthControls();
+  wireReaderAspectControls();
 }
 
 function wireZoneGridEvents() {
@@ -1191,6 +1204,13 @@ function cyclePanelSection(direction) {
 function handleReaderKeydown(event) {
   if (event.defaultPrevented) return;
   if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    togglePanel();
+    return;
+  }
+
   if (isEditableTarget(event.target)) return;
 
   if (event.key === 'm' || event.key === 'M') {
@@ -1202,14 +1222,6 @@ function handleReaderKeydown(event) {
   if (event.key === 'r' || event.key === 'R') {
     event.preventDefault();
     refreshServiceWorker();
-    return;
-  }
-
-  if (event.key === 'Escape') {
-    if (!panelEl.classList.contains('hidden')) {
-      event.preventDefault();
-      closePanel();
-    }
     return;
   }
 
