@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent"
+  android:layout_height="wrap_content"
+  android:padding="6dp">
+
+  <LinearLayout
+    android:id="@+id/book"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/frame"
+    android:clickable="true"
+    android:focusable="true"
+    android:orientation="vertical">
+
+    <com.omrilotan.squidread.CoverView
+      android:id="@+id/cover"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:gravity="center"
+      android:padding="8dp"
+      android:scaleType="centerCrop"
+      android:importantForAccessibility="no" />
+
+    <TextView
+      android:id="@+id/title"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:ellipsize="end"
+      android:gravity="center"
+      android:maxLines="2"
+      android:padding="6dp"
+      android:textColor="@android:color/black"
+      android:textDirection="firstStrong"
+      android:textSize="14sp" />
+  </LinearLayout>
+
+  <TextView
+    android:id="@+id/delete"
+    style="@style/Squidread.Button"
+    android:layout_width="40dp"
+    android:layout_height="40dp"
+    android:layout_gravity="top|end"
+    android:background="@drawable/delete_button"
+    android:minHeight="40dp"
+    android:paddingStart="0dp"
+    android:paddingEnd="0dp"
+    android:text="@string/close_symbol" />
+</FrameLayout>

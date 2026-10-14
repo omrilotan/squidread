@@ -7,6 +7,8 @@ const panelEl = document.getElementById('panel');
 const filePicker = document.getElementById('filePicker');
 const toastEl = document.getElementById('toast');
 const viewerEl = document.getElementById('viewer');
+const readerEl = document.querySelector('.reader');
+const readerFooterEl = document.querySelector('.readerFooter');
 const tocListEl = document.getElementById('tocList');
 const progressEl = document.getElementById('progress');
 const progressFillEl = document.getElementById('progressFill');
@@ -336,10 +338,10 @@ function wireEvents() {
   const handleViewerPointer = (event) => {
     const target = event.target;
     if (!isDomElement(target)) return;
-    if (typeof target.closest === 'function' && target.closest('a[href]')) return;
-    handleViewerZoneClick(event, viewerEl.getBoundingClientRect());
+    if (typeof target.closest === 'function' && target.closest('a[href], .readerFooter')) return;
+    handleViewerZoneClick(event.clientX, event.clientY);
   };
-  viewerEl?.addEventListener('click', handleViewerPointer, true);
+  readerEl?.addEventListener('click', handleViewerPointer, true);
   closePanelBtn.addEventListener('click', () => closePanel());
   swRefreshLink?.addEventListener('click', async (event) => {
     event.preventDefault();
@@ -850,6 +852,13 @@ function injectContentCSS() {
             max-width: 100% !important;
             height: auto !important;
           }
+          /* Taps turn pages; text selection swallows them */
+          html, body {
+            -webkit-user-select: none !important;
+            user-select: none !important;
+            -webkit-touch-callout: none !important;
+            -webkit-tap-highlight-color: transparent;
+          }
         `;
         doc.head.appendChild(style);
       }
@@ -1251,16 +1260,21 @@ function handleReaderKeydown(event) {
   }
 }
 
-function handleViewerZoneClick(event, rect) {
-  if (!rect || rect.width <= 0 || rect.height <= 0) return;
-  const smallestX = Math.min(...[event.clientX, event.screenX, event.pageX].filter(Number.isFinite)) ?? event.clientX;
-  const x = smallestX;
-  const y = event.clientY;
-  log.debug('Viewer click at:', { x, y, rect, event });
-  if (x < 0 || y < 0 || x > rect.width || y > rect.height) return;
+// Coordinates are relative to the top-level window viewport. Zones span the
+// whole reader area above the footer, not only the (possibly narrower) viewer.
+function handleViewerZoneClick(clientX, clientY) {
+  const rect = readerEl?.getBoundingClientRect();
+  if (!rect) return;
+  const width = rect.width;
+  const height = rect.height - (readerFooterEl?.offsetHeight || 0);
+  if (width <= 0 || height <= 0) return;
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+  log.debug('Viewer click at:', { x, y, width, height });
+  if (x < 0 || y < 0 || x > width || y > height) return;
 
-  const col = getZoneIndex(x, rect.width);
-  const row = getZoneIndex(y, rect.height);
+  const col = getZoneIndex(x, width);
+  const row = getZoneIndex(y, height);
   let action = getZoneAction(row, col);
   log.debug('Viewer zone click:', { x, y, col, row, action });
   if (!action) return;
@@ -1309,11 +1323,12 @@ function handleRenditionContentPointer(event) {
   event.stopImmediatePropagation?.();
   event.stopPropagation?.();
 
-  const doc = target.ownerDocument;
-  const bodyRect = doc?.body?.getBoundingClientRect?.();
-  if (!bodyRect || bodyRect.width <= 0 || bodyRect.height <= 0) return;
+  // Event coordinates are relative to the iframe, which epub.js makes wider
+  // than the viewer and shifts per page. Map them to the top-level viewport.
+  const frameRect = target.ownerDocument?.defaultView?.frameElement?.getBoundingClientRect?.();
+  if (!frameRect) return;
 
-  handleViewerZoneClick(event, bodyRect);
+  handleViewerZoneClick(frameRect.left + event.clientX, frameRect.top + event.clientY);
 }
 
 function getZoneIndex(value, max) {

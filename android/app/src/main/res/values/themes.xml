@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- E-ink: pure black on white, no animations, no ripples, no shadows. -->
+  <style name="Theme.Squidread" parent="Theme.AppCompat.Light.NoActionBar">
+    <item name="android:windowBackground">@android:color/white</item>
+    <item name="android:windowAnimationStyle">@null</item>
+    <item name="android:windowActivityTransitions">false</item>
+    <item name="android:statusBarColor">@android:color/white</item>
+    <item name="android:navigationBarColor">@android:color/white</item>
+    <item name="android:textColor">@android:color/black</item>
+    <item name="android:textColorPrimary">@android:color/black</item>
+    <item name="android:textColorSecondary">@android:color/black</item>
+    <item name="colorPrimary">@android:color/black</item>
+    <item name="colorAccent">@android:color/black</item>
+    <item name="colorControlNormal">@android:color/black</item>
+    <item name="colorControlHighlight">@android:color/transparent</item>
+    <item name="alertDialogTheme">@style/Theme.Squidread.Dialog</item>
+  </style>
+
+  <style name="Theme.Squidread.Dialog" parent="Theme.AppCompat.Light.Dialog.Alert">
+    <item name="android:windowAnimationStyle">@null</item>
+    <item name="android:windowBackground">@drawable/dialog_background</item>
+    <item name="android:backgroundDimEnabled">false</item>
+    <item name="android:windowElevation">0dp</item>
+    <item name="colorAccent">@android:color/black</item>
+    <item name="colorControlHighlight">@android:color/transparent</item>
+  </style>
+
+  <style name="Squidread.Button" parent="">
+    <item name="android:background">@drawable/button</item>
+    <item name="android:textColor">@color/button_text</item>
+    <item name="android:gravity">center</item>
+    <item name="android:minHeight">48dp</item>
+    <item name="android:paddingStart">12dp</item>
+    <item name="android:paddingEnd">12dp</item>
+    <item name="android:textSize">16sp</item>
+    <item name="android:clickable">true</item>
+    <item name="android:focusable">true</item>
+  </style>
+
+  <style name="Squidread.Heading" parent="">
+    <item name="android:textSize">18sp</item>
+    <item name="android:textStyle">bold</item>
+    <item name="android:textColor">@android:color/black</item>
+    <item name="android:paddingTop">20dp</item>
+    <item name="android:paddingBottom">8dp</item>
+  </style>
+</resources>

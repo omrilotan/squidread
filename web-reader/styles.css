@@ -16,6 +16,13 @@
   --panel-background: rgba(255, 255, 255, 1);
   --viewer-bg: #fff;
   --max-width-setting-box: 300px;
+  --viewport-height: 100vh;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --viewport-height: 100dvh;
+  }
 }
 
 body {
@@ -23,7 +30,7 @@ body {
   font-family: 'Space Grotesk', 'Helvetica Neue', sans-serif;
   background: var(--bg);
   color: var(--text);
-  min-height: 100vh;
+  min-height: var(--viewport-height);
 }
 
 .topbar {
@@ -52,7 +59,7 @@ body {
 .layout {
   display: grid;
   grid-template-columns: 1fr;
-  min-height: 100vh;
+  height: var(--viewport-height);
   position: relative;
   max-width: 100%;
   overflow: hidden;
@@ -63,7 +70,7 @@ body {
   top: 0;
   left: 0;
   width: 100%;
-  height: 100vh;
+  height: var(--viewport-height);
   background: transparent;
   padding: 0;
   display: flex;
@@ -113,6 +120,7 @@ body {
 .panelIcon {
   width: 32px;
   height: 32px;
+  image-rendering: pixelated;
   display: block;
 }
 
@@ -253,11 +261,17 @@ body {
   align-items: stretch;
   width: 100vw;
   max-width: 100%;
+  height: var(--viewport-height);
   box-sizing: border-box;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .viewer {
   flex: 1;
+  min-height: 0;
   overflow: hidden;
   width: 100%;
   height: 100%;
@@ -266,11 +280,12 @@ body {
 }
 
 .viewer.hasAspectRatio {
+  flex: 0 0 auto;
   align-self: center;
-  width: min(100%, calc((100vh - var(--footer-height)) * var(--reader-aspect-ratio)));
+  width: min(100%, calc((var(--viewport-height) - var(--footer-height)) * var(--reader-aspect-ratio)));
   height: auto;
   aspect-ratio: var(--reader-aspect-ratio);
-  max-height: calc(100vh - var(--footer-height));
+  max-height: calc(var(--viewport-height) - var(--footer-height));
 }
 
 .viewer iframe {
@@ -683,7 +698,6 @@ button.ghost {
 }
 
 .viewer {
-  height: calc(100vh - 80px);
   background: var(--viewer-bg);
   border: 1px solid var(--border);
   border-radius: 14px;

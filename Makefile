@@ -1,2 +1,19 @@
-start:
-	npx serve -s dist -l 5050
+.PHONY: reader site android android-release android-bundle
+
+# Homebrew's JDK is keg-only; override if yours lives elsewhere.
+export JAVA_HOME ?= /opt/homebrew/opt/openjdk@17
+
+reader:
+	npx serve -s web-reader -l 5050
+
+site:
+	npx serve site -l 5051
+
+android:
+	cd android && ./gradlew assembleDebug
+
+android-release:
+	cd android && ./gradlew assembleRelease
+
+android-bundle:
+	cd android && ./gradlew bundleRelease

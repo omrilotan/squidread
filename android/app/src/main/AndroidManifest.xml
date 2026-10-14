@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:tools="http://schemas.android.com/tools">
+
+  <!-- Brought in by Readium's audio support, which a reader of EPUBs never uses. -->
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+  <uses-permission android:name="android.permission.WAKE_LOCK" tools:node="remove" />
+
+  <!--
+    No cloud or adb backups of the library: books stay on the device. Moving to a new device
+    (Android 12 and later) still brings them along.
+  -->
+  <application
+    android:name=".SquidreadApplication"
+    android:allowBackup="false"
+    android:icon="@mipmap/ic_launcher"
+    android:label="@string/app_name"
+    android:supportsRtl="true"
+    android:theme="@style/Theme.Squidread">
+
+    <!-- Reader: one task per book, so each open book is its own entry in recents. -->
+    <activity
+      android:name=".MainActivity"
+      android:autoRemoveFromRecents="true"
+      android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+      android:documentLaunchMode="intoExisting"
+      android:exported="false" />
+
+    <!--
+      Entry point for the launcher, "Open with" and share; hands over to a book's task.
+      Runs in its own hidden task so it never lingers in the calling app's recents snapshot.
+    -->
+    <activity
+      android:name=".LauncherActivity"
+      android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+      android:excludeFromRecents="true"
+      android:exported="true"
+      android:launchMode="singleInstance"
+      android:noHistory="true"
+      android:taskAffinity="">
+
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+
+      <!-- "Open with" for files typed as EPUB; lets the user pick Squidread as the default -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="content" />
+        <data android:mimeType="application/epub+zip" />
+      </intent-filter>
+
+      <!-- Providers that report a generic type but keep the .epub extension in the path -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="content" />
+        <data android:host="*" />
+        <data android:mimeType="*/*" />
+        <data android:pathPattern=".*\\.epub" />
+        <data android:pathPattern=".*\\..*\\.epub" />
+        <data android:pathPattern=".*\\..*\\..*\\.epub" />
+        <data android:pathPattern=".*\\..*\\..*\\..*\\.epub" />
+        <data android:pathPattern=".*\\.EPUB" />
+      </intent-filter>
+
+      <!-- Share sheet -->
+      <intent-filter>
+        <action android:name="android.intent.action.SEND" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:mimeType="application/epub+zip" />
+      </intent-filter>
+    </activity>
+
+    <activity android:name="androidx.media3.session.BluetoothValidationActivity" tools:node="remove" />
+
+    <!-- The UI has no emoji, and books draw their own text; loading the emoji font only costs time. -->
+    <provider
+      android:name="androidx.startup.InitializationProvider"
+      android:authorities="${applicationId}.androidx-startup"
+      android:exported="false"
+      tools:node="merge">
+      <meta-data android:name="androidx.emoji2.text.EmojiCompatInitializer" tools:node="remove" />
+    </provider>
+  </application>
+</manifest>

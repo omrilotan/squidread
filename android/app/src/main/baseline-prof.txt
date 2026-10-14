@@ -1,0 +1,10 @@
+# Code on the path from opening a book to its first page and page turns, compiled ahead of time
+# at install so the first runs after an install or update aren't interpreted.
+HSPLcom/omrilotan/squidread/**;->**(**)**
+HSPLorg/readium/r2/shared/**;->**(**)**
+HSPLorg/readium/r2/streamer/**;->**(**)**
+HSPLorg/readium/r2/navigator/epub/**;->**(**)**
+HSPLorg/readium/r2/navigator/pager/**;->**(**)**
+HSPLorg/readium/r2/navigator/R2*;->**(**)**
+HSPLorg/jsoup/**;->**(**)**
+HSPLkotlinx/coroutines/**;->**(**)**

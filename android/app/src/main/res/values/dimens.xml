@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!--
+    Page margins above and below the text. Applied by the app around the reader rather than by
+    Readium (whose own padding, zeroed below, did not show on some e-ink devices).
+  -->
+  <dimen name="reader_padding_top">24dp</dimen>
+  <dimen name="reader_padding_bottom">20dp</dimen>
+  <dimen name="readium_navigator_epub_vertical_padding">0dp</dimen>
+</resources>

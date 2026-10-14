@@ -1,0 +1,494 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:tools="http://schemas.android.com/tools"
+  android:id="@+id/root"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@android:color/white">
+
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <!-- Focusable so page keys reach it first; it never draws a focus highlight. -->
+    <com.omrilotan.squidread.ReaderFrame
+      android:id="@+id/reader_area"
+      android:layout_width="match_parent"
+      android:layout_height="0dp"
+      android:layout_weight="1"
+      android:defaultFocusHighlightEnabled="false"
+      android:focusable="true"
+      android:focusableInTouchMode="true"
+      tools:targetApi="o">
+
+      <FrameLayout
+        android:id="@+id/navigator_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:paddingTop="@dimen/reader_padding_top"
+        android:paddingBottom="@dimen/reader_padding_bottom" />
+
+      <TextView
+        android:id="@+id/reader_message"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="@string/no_book"
+        android:textColor="@android:color/black"
+        android:textSize="18sp" />
+
+      <!-- Shown from the moment a book is chosen until its first page is drawn. -->
+      <LinearLayout
+        android:id="@+id/loading"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/white"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="32dp"
+        android:visibility="gone">
+
+        <ImageView
+          android:id="@+id/loading_cover"
+          android:layout_width="160dp"
+          android:layout_height="240dp"
+          android:layout_marginBottom="20dp"
+          android:background="@drawable/frame"
+          android:importantForAccessibility="no"
+          android:padding="1dp"
+          android:scaleType="centerCrop" />
+
+        <TextView
+          android:id="@+id/loading_title"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:gravity="center"
+          android:maxLines="3"
+          android:ellipsize="end"
+          android:textColor="@android:color/black"
+          android:textDirection="firstStrong"
+          android:textSize="20sp"
+          android:textStyle="bold" />
+
+        <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:paddingTop="8dp"
+          android:text="@string/opening"
+          android:textColor="@android:color/black"
+          android:textSize="16sp" />
+      </LinearLayout>
+    </com.omrilotan.squidread.ReaderFrame>
+
+    <!-- Footer keeps a fixed left-to-right layout, like the web app. -->
+    <LinearLayout
+      android:id="@+id/footer"
+      android:layout_width="match_parent"
+      android:layout_height="36dp"
+      android:background="@drawable/border_top"
+      android:gravity="center_vertical"
+      android:layoutDirection="ltr"
+      android:orientation="horizontal"
+      android:paddingStart="16dp"
+      android:paddingEnd="16dp">
+
+      <TextView
+        android:id="@+id/clock"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFeatureSettings="tnum"
+        android:textColor="@android:color/black"
+        android:textSize="14sp" />
+
+      <TextView
+        android:id="@+id/chapter_info"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:singleLine="true"
+        android:textColor="@android:color/black"
+        android:textDirection="firstStrong"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+      <TextView
+        android:id="@+id/progress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFeatureSettings="tnum"
+        android:textColor="@android:color/black"
+        android:textSize="14sp" />
+    </LinearLayout>
+  </LinearLayout>
+
+  <LinearLayout
+    android:id="@+id/menu"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent"
+    android:clickable="true"
+    android:focusable="true"
+    android:orientation="vertical"
+    android:visibility="gone">
+
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:background="@android:color/white"
+      android:gravity="center_vertical"
+      android:orientation="horizontal"
+      android:padding="8dp">
+
+      <ImageView
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/logo" />
+
+      <TextView
+        android:id="@+id/menu_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:singleLine="true"
+        android:text="@string/app_name"
+        android:textColor="@android:color/black"
+        android:textDirection="firstStrong"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+      <TextView
+        android:id="@+id/close_menu"
+        style="@style/Squidread.Button"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:contentDescription="@string/close_menu"
+        android:paddingStart="0dp"
+        android:paddingEnd="0dp"
+        android:text="@string/close_symbol" />
+    </LinearLayout>
+
+    <LinearLayout
+      android:id="@+id/tabs"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:background="@drawable/border_bottom"
+      android:orientation="horizontal"
+      android:paddingStart="8dp"
+      android:paddingEnd="8dp"
+      android:paddingBottom="10dp">
+
+      <TextView
+        android:id="@+id/tab_styles"
+        style="@style/Squidread.Button"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="4dp"
+        android:layout_weight="1"
+        android:text="@string/tab_styles" />
+
+      <TextView
+        android:id="@+id/tab_contents"
+        style="@style/Squidread.Button"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="4dp"
+        android:layout_weight="1"
+        android:text="@string/tab_contents" />
+
+      <TextView
+        android:id="@+id/tab_library"
+        style="@style/Squidread.Button"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="4dp"
+        android:layout_weight="1"
+        android:text="@string/tab_library" />
+
+      <TextView
+        android:id="@+id/tab_settings"
+        style="@style/Squidread.Button"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:layout_weight="1"
+        android:text="@string/tab_settings" />
+    </LinearLayout>
+
+    <FrameLayout
+      android:layout_width="match_parent"
+      android:layout_height="0dp"
+      android:layout_weight="1">
+
+      <!-- A see-through window onto the book behind the menu, to preview font size changes.
+           The menu consumes touches, so the book can't be operated through it. -->
+      <LinearLayout
+        android:id="@+id/section_styles"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <View
+          android:layout_width="match_parent"
+          android:layout_height="16dp"
+          android:background="@android:color/white" />
+
+        <LinearLayout
+          android:layout_width="match_parent"
+          android:layout_height="0dp"
+          android:layout_weight="1"
+          android:orientation="horizontal">
+
+          <View
+            android:layout_width="16dp"
+            android:layout_height="match_parent"
+            android:background="@android:color/white" />
+
+          <View
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/preview_window"
+            android:importantForAccessibility="no" />
+
+          <View
+            android:layout_width="16dp"
+            android:layout_height="match_parent"
+            android:background="@android:color/white" />
+        </LinearLayout>
+
+        <LinearLayout
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:background="@android:color/white"
+          android:gravity="center"
+          android:orientation="vertical"
+          android:paddingBottom="16dp">
+
+          <TextView
+            style="@style/Squidread.Heading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingTop="12dp"
+            android:text="@string/font_size" />
+
+          <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:baselineAligned="false"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+              android:id="@+id/font_decrease"
+              style="@style/Squidread.Button"
+              android:layout_width="64dp"
+              android:layout_height="wrap_content"
+              android:text="@string/minus_symbol"
+              android:textSize="22sp" />
+
+            <TextView
+              android:id="@+id/font_reset"
+              style="@style/Squidread.Button"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginStart="12dp"
+              android:layout_marginEnd="12dp"
+              android:minWidth="96dp"
+              android:text="@string/font_reset" />
+
+            <TextView
+              android:id="@+id/font_increase"
+              style="@style/Squidread.Button"
+              android:layout_width="64dp"
+              android:layout_height="wrap_content"
+              android:text="@string/plus_symbol"
+              android:textSize="22sp" />
+          </LinearLayout>
+
+          <TextView
+            android:id="@+id/font_size_value"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingTop="8dp"
+            android:textColor="@android:color/black"
+            android:textSize="16sp" />
+
+          <TextView
+            style="@style/Squidread.Heading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingTop="12dp"
+            android:text="@string/font" />
+
+          <LinearLayout
+            android:id="@+id/font_picker"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:baselineAligned="false"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <TextView
+              android:id="@+id/font_previous"
+              style="@style/Squidread.Button"
+              android:layout_width="64dp"
+              android:layout_height="wrap_content"
+              android:contentDescription="@string/font_previous"
+              android:text="@string/previous_symbol"
+              android:textSize="22sp" />
+
+            <TextView
+              android:id="@+id/font_name"
+              style="@style/Squidread.Button"
+              android:layout_width="0dp"
+              android:layout_height="wrap_content"
+              android:layout_marginStart="12dp"
+              android:layout_marginEnd="12dp"
+              android:layout_weight="1"
+              android:ellipsize="end"
+              android:maxLines="1" />
+
+            <TextView
+              android:id="@+id/font_next"
+              style="@style/Squidread.Button"
+              android:layout_width="64dp"
+              android:layout_height="wrap_content"
+              android:contentDescription="@string/font_next"
+              android:text="@string/next_symbol"
+              android:textSize="22sp" />
+          </LinearLayout>
+
+          <TextView
+            android:id="@+id/fonts_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingStart="16dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="16dp"
+            android:textColor="@android:color/black"
+            android:textSize="15sp"
+            android:visibility="gone" />
+
+          <TextView
+            android:id="@+id/fonts_folder"
+            style="@style/Squidread.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/fonts_allow"
+            android:visibility="gone" />
+        </LinearLayout>
+      </LinearLayout>
+
+      <FrameLayout
+        android:id="@+id/section_contents"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/white"
+        android:visibility="gone">
+
+        <androidx.recyclerview.widget.RecyclerView
+          android:id="@+id/toc_list"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
+          android:overScrollMode="never"
+          android:scrollbars="none" />
+
+        <TextView
+          android:id="@+id/toc_empty"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:gravity="center"
+          android:padding="32dp"
+          android:textColor="@android:color/black"
+          android:textSize="16sp"
+          android:visibility="gone" />
+      </FrameLayout>
+
+      <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/library_list"
+        android:background="@android:color/white"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:overScrollMode="never"
+        android:padding="8dp"
+        android:clipToPadding="false"
+        android:scrollbars="none"
+        android:visibility="gone" />
+
+      <ScrollView
+        android:id="@+id/section_settings"
+        android:background="@android:color/white"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:overScrollMode="never"
+        android:scrollbars="none"
+        android:visibility="gone">
+
+        <LinearLayout
+          android:id="@+id/settings_content"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:gravity="center_horizontal"
+          android:orientation="vertical"
+          android:paddingStart="16dp"
+          android:paddingEnd="16dp"
+          android:paddingBottom="24dp" />
+      </ScrollView>
+    </FrameLayout>
+  </LinearLayout>
+
+  <!--
+    White backing for the system bars while the menu shows them. The bars overlay the reader
+    instead of resizing it, so opening the menu never re-paginates the book.
+  -->
+  <View
+    android:id="@+id/bar_scrim_top"
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_gravity="top"
+    android:background="@android:color/white"
+    android:visibility="gone" />
+
+  <View
+    android:id="@+id/bar_scrim_bottom"
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_gravity="bottom"
+    android:background="@android:color/white"
+    android:visibility="gone" />
+
+  <View
+    android:id="@+id/bar_scrim_left"
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_gravity="left"
+    android:background="@android:color/white"
+    android:visibility="gone" />
+
+  <View
+    android:id="@+id/bar_scrim_right"
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_gravity="right"
+    android:background="@android:color/white"
+    android:visibility="gone" />
+</FrameLayout>

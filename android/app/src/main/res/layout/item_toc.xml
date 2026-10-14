@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent"
+  android:layout_height="wrap_content"
+  android:background="@drawable/toc_item"
+  android:clickable="true"
+  android:focusable="true"
+  android:minHeight="48dp"
+  android:gravity="center_vertical|start"
+  android:paddingTop="10dp"
+  android:paddingBottom="10dp"
+  android:paddingEnd="16dp"
+  android:textAlignment="viewStart"
+  android:textColor="@color/button_text"
+  android:textDirection="firstStrong"
+  android:textSize="16sp" />

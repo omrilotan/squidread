@@ -1,0 +1,298 @@
+/*
+ * Mobile first: the base rules are the phone layout; wider screens build on them.
+ * Black on white, like the app: legible on e-ink browsers too.
+ */
+:root {
+	--ink: #000;
+	--paper: #fff;
+	--gutter: 16px;
+	--content: 1120px;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+}
+
+body {
+	margin: 0;
+	background: var(--paper);
+	color: var(--ink);
+	font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	font-size: 1.0625rem;
+	line-height: 1.5;
+}
+
+a {
+	color: var(--ink);
+}
+
+h1,
+h2,
+h3 {
+	line-height: 1.2;
+}
+
+/* --- Hero: the name, the promise and both actions on the first screen of a phone. --- */
+
+.hero {
+	padding: 32px var(--gutter);
+	text-align: center;
+}
+
+.logo {
+	display: block;
+	width: 112px;
+	height: 112px;
+	margin: 0 auto;
+}
+
+h1 {
+	margin: 8px 0 4px;
+	font-size: 2.25rem;
+	letter-spacing: 0.02em;
+}
+
+.tagline {
+	max-width: 22em;
+	margin: 0 auto 24px;
+	font-size: 1.1875rem;
+}
+
+/* Stacked, full-width buttons: big targets for a thumb. */
+.actions {
+	display: grid;
+	gap: 12px;
+	max-width: 360px;
+	margin: 0 auto;
+}
+
+.button {
+	display: block;
+	padding: 14px 20px;
+	border: 2px solid var(--ink);
+	font-weight: 600;
+	text-align: center;
+	text-decoration: none;
+}
+
+.button.primary,
+.button:hover,
+.button:focus-visible {
+	background: var(--ink);
+	color: var(--paper);
+}
+
+.button.primary:hover,
+.button.primary:focus-visible {
+	background: var(--paper);
+	color: var(--ink);
+}
+
+.note {
+	max-width: 30em;
+	margin: 16px auto 0;
+	font-size: 0.9375rem;
+}
+
+main {
+	border-top: 2px solid var(--ink);
+}
+
+section h2 {
+	margin: 0 0 20px;
+	padding: 0 var(--gutter);
+	text-align: center;
+	font-size: 1.5rem;
+}
+
+/* --- Screenshots: one at a time on phones, swiped sideways with the next peeking in. - */
+
+.screenshots {
+	max-width: var(--content);
+	margin: 0 auto;
+	padding: 32px 0 8px;
+}
+
+.screenshots ul {
+	display: grid;
+	grid-auto-flow: column;
+	grid-auto-columns: 72%;
+	gap: 16px;
+	margin: 0;
+	padding: 0 var(--gutter) 16px;
+	list-style: none;
+	overflow-x: auto;
+	overscroll-behavior-x: contain;
+	scroll-snap-type: x mandatory;
+	scroll-padding: 0 var(--gutter);
+	scrollbar-width: none;
+}
+
+.screenshots ul::-webkit-scrollbar {
+	display: none;
+}
+
+.screenshots li {
+	scroll-snap-align: center;
+}
+
+.screenshots figure {
+	margin: 0;
+}
+
+.screenshots img {
+	display: block;
+	width: 100%;
+	height: auto;
+	border: 2px solid var(--ink);
+}
+
+.screenshots figcaption {
+	margin-top: 10px;
+	text-align: center;
+	font-size: 0.9375rem;
+}
+
+/* --- Features: a plain list between rules on phones; cards once there is room. ------- */
+
+.features {
+	max-width: var(--content);
+	margin: 0 auto;
+	padding: 32px var(--gutter) 40px;
+}
+
+.features ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	border-bottom: 1px solid var(--ink);
+}
+
+.features li {
+	padding: 18px 0;
+	border-top: 1px solid var(--ink);
+}
+
+.features h3 {
+	margin: 0 0 6px;
+	font-size: 1.125rem;
+}
+
+.features p {
+	margin: 0;
+}
+
+footer {
+	padding: 16px var(--gutter) 32px;
+	border-top: 2px solid var(--ink);
+	text-align: center;
+}
+
+footer a {
+	display: inline-block;
+	padding: 12px;
+}
+
+/* --- Privacy policy: one readable column. ------------------------------------------- */
+
+.policy {
+	max-width: 42rem;
+	margin: 0 auto;
+	padding: 24px var(--gutter) 40px;
+}
+
+.policy h1 {
+	margin-top: 16px;
+}
+
+.policy h2 {
+	margin: 32px 0 8px;
+	font-size: 1.375rem;
+	text-align: left;
+}
+
+.policy li {
+	margin-bottom: 8px;
+}
+
+/* --- Large phones in landscape and small tablets ------------------------------------ */
+
+@media (min-width: 600px) {
+	.hero {
+		padding-top: 48px;
+		padding-bottom: 40px;
+	}
+
+	.logo {
+		width: 144px;
+		height: 144px;
+	}
+
+	h1 {
+		font-size: 3rem;
+	}
+
+	.tagline {
+		font-size: 1.25rem;
+	}
+
+	/* Side by side once both fit. */
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		max-width: none;
+	}
+
+	.button {
+		min-width: 220px;
+	}
+
+	.screenshots ul {
+		grid-auto-columns: 42%;
+	}
+
+	.features ul {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 16px;
+		border-bottom: 0;
+	}
+
+	.features li {
+		padding: 20px;
+		border: 1px solid var(--ink);
+	}
+}
+
+/* --- Desktop: all four screenshots in a row, three feature cards across ------------- */
+
+@media (min-width: 960px) {
+	.hero {
+		padding-top: 56px;
+	}
+
+	.screenshots {
+		padding-top: 40px;
+	}
+
+	.screenshots ul {
+		grid-auto-flow: row;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		overflow: visible;
+	}
+
+	.features {
+		padding-top: 40px;
+		padding-bottom: 48px;
+	}
+
+	.features ul {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
