@@ -220,6 +220,37 @@ footer a {
 	margin-bottom: 8px;
 }
 
+/* --- Default reader: the two dialogs, stacked on phones and side by side on wider screens. */
+
+.default-steps {
+	display: grid;
+	gap: 32px;
+	margin: 24px 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.default-steps figure {
+	max-width: 320px;
+	margin: 0 auto;
+}
+
+.default-steps img {
+	display: block;
+	width: 100%;
+	height: auto;
+	border: 2px solid var(--ink);
+}
+
+.default-steps figcaption {
+	margin-top: 12px;
+}
+
+.default-steps ol {
+	margin: 4px 0 0;
+	padding-left: 1.5em;
+}
+
 /* --- Large phones in landscape and small tablets ------------------------------------ */
 
 @media (min-width: 600px) {
@@ -267,6 +298,11 @@ footer a {
 	.features li {
 		padding: 20px;
 		border: 1px solid var(--ink);
+	}
+
+	.default-steps {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		align-items: start;
 	}
 }
 
