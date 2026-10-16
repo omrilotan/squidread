@@ -311,7 +311,7 @@ footer a {
 	}
 }
 
-/* --- Desktop: all five screenshots in a row, three feature cards across ------------- */
+/* --- Desktop: all six screenshots in a row, three feature cards across ------------- */
 
 @media (min-width: 960px) {
 	.hero {
@@ -324,7 +324,7 @@ footer a {
 
 	.screenshots ul {
 		grid-auto-flow: row;
-		grid-template-columns: repeat(5, minmax(0, 1fr));
+		grid-template-columns: repeat(6, minmax(0, 1fr));
 		overflow: visible;
 	}
 
