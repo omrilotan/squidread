@@ -4,7 +4,7 @@
   android:id="@+id/root"
   android:layout_width="match_parent"
   android:layout_height="match_parent"
-  android:background="@android:color/white">
+  android:background="@color/paper">
 
   <LinearLayout
     android:layout_width="match_parent"
@@ -35,7 +35,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:text="@string/no_book"
-        android:textColor="@android:color/black"
+        android:textColor="@color/ink"
         android:textSize="18sp" />
 
       <!-- Shown from the moment a book is chosen until its first page is drawn. -->
@@ -43,7 +43,7 @@
         android:id="@+id/loading"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@android:color/white"
+        android:background="@color/paper"
         android:clickable="true"
         android:focusable="true"
         android:gravity="center"
@@ -68,7 +68,7 @@
           android:gravity="center"
           android:maxLines="3"
           android:ellipsize="end"
-          android:textColor="@android:color/black"
+          android:textColor="@color/ink"
           android:textDirection="firstStrong"
           android:textSize="20sp"
           android:textStyle="bold" />
@@ -78,7 +78,7 @@
           android:layout_height="wrap_content"
           android:paddingTop="8dp"
           android:text="@string/opening"
-          android:textColor="@android:color/black"
+          android:textColor="@color/ink"
           android:textSize="16sp" />
       </LinearLayout>
     </com.omrilotan.squidread.ReaderFrame>
@@ -100,7 +100,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:fontFeatureSettings="tnum"
-        android:textColor="@android:color/black"
+        android:textColor="@color/ink"
         android:textSize="14sp" />
 
       <TextView
@@ -115,7 +115,7 @@
         android:paddingStart="12dp"
         android:paddingEnd="12dp"
         android:singleLine="true"
-        android:textColor="@android:color/black"
+        android:textColor="@color/ink"
         android:textDirection="firstStrong"
         android:textSize="14sp"
         android:textStyle="bold" />
@@ -125,7 +125,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:fontFeatureSettings="tnum"
-        android:textColor="@android:color/black"
+        android:textColor="@color/ink"
         android:textSize="14sp" />
     </LinearLayout>
   </LinearLayout>
@@ -143,14 +143,16 @@
     <LinearLayout
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
-      android:background="@android:color/white"
+      android:background="@color/paper"
       android:gravity="center_vertical"
       android:orientation="horizontal"
       android:padding="8dp">
 
       <ImageView
-        android:layout_width="32dp"
-        android:layout_height="32dp"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:padding="3dp"
+        android:background="@drawable/logo_background"
         android:importantForAccessibility="no"
         android:src="@drawable/logo" />
 
@@ -164,7 +166,7 @@
         android:paddingEnd="12dp"
         android:singleLine="true"
         android:text="@string/app_name"
-        android:textColor="@android:color/black"
+        android:textColor="@color/ink"
         android:textDirection="firstStrong"
         android:textSize="20sp"
         android:textStyle="bold" />
@@ -245,7 +247,7 @@
         <View
           android:layout_width="match_parent"
           android:layout_height="16dp"
-          android:background="@android:color/white" />
+          android:background="@color/paper" />
 
         <LinearLayout
           android:layout_width="match_parent"
@@ -256,7 +258,7 @@
           <View
             android:layout_width="16dp"
             android:layout_height="match_parent"
-            android:background="@android:color/white" />
+            android:background="@color/paper" />
 
           <View
             android:layout_width="0dp"
@@ -268,13 +270,13 @@
           <View
             android:layout_width="16dp"
             android:layout_height="match_parent"
-            android:background="@android:color/white" />
+            android:background="@color/paper" />
         </LinearLayout>
 
         <LinearLayout
           android:layout_width="match_parent"
           android:layout_height="wrap_content"
-          android:background="@android:color/white"
+          android:background="@color/paper"
           android:gravity="center"
           android:orientation="vertical"
           android:paddingBottom="16dp">
@@ -325,7 +327,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:paddingTop="8dp"
-            android:textColor="@android:color/black"
+            android:textColor="@color/ink"
             android:textSize="16sp" />
 
           <TextView
@@ -383,7 +385,7 @@
             android:paddingStart="16dp"
             android:paddingTop="4dp"
             android:paddingEnd="16dp"
-            android:textColor="@android:color/black"
+            android:textColor="@color/ink"
             android:textSize="15sp"
             android:visibility="gone" />
 
@@ -402,7 +404,7 @@
         android:id="@+id/section_contents"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@android:color/white"
+        android:background="@color/paper"
         android:visibility="gone">
 
         <androidx.recyclerview.widget.RecyclerView
@@ -418,14 +420,14 @@
           android:layout_height="wrap_content"
           android:gravity="center"
           android:padding="32dp"
-          android:textColor="@android:color/black"
+          android:textColor="@color/ink"
           android:textSize="16sp"
           android:visibility="gone" />
       </FrameLayout>
 
       <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/library_list"
-        android:background="@android:color/white"
+        android:background="@color/paper"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:overScrollMode="never"
@@ -436,7 +438,7 @@
 
       <ScrollView
         android:id="@+id/section_settings"
-        android:background="@android:color/white"
+        android:background="@color/paper"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:overScrollMode="never"
@@ -465,7 +467,7 @@
     android:layout_width="match_parent"
     android:layout_height="0dp"
     android:layout_gravity="top"
-    android:background="@android:color/white"
+    android:background="@color/paper"
     android:visibility="gone" />
 
   <View
@@ -473,7 +475,7 @@
     android:layout_width="match_parent"
     android:layout_height="0dp"
     android:layout_gravity="bottom"
-    android:background="@android:color/white"
+    android:background="@color/paper"
     android:visibility="gone" />
 
   <View
@@ -481,7 +483,7 @@
     android:layout_width="0dp"
     android:layout_height="match_parent"
     android:layout_gravity="left"
-    android:background="@android:color/white"
+    android:background="@color/paper"
     android:visibility="gone" />
 
   <View
@@ -489,6 +491,6 @@
     android:layout_width="0dp"
     android:layout_height="match_parent"
     android:layout_gravity="right"
-    android:background="@android:color/white"
+    android:background="@color/paper"
     android:visibility="gone" />
 </FrameLayout>

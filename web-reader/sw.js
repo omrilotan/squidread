@@ -1,4 +1,4 @@
-const CACHE_NAME = 'squidread-shell-v3';
+const CACHE_NAME = 'squidread-shell-v4';
 const ASSETS = [
   '/',
   '/index.html',

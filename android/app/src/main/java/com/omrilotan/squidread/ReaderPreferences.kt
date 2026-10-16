@@ -5,6 +5,9 @@ import androidx.core.content.edit
 
 enum class ZoneAction { PREV, MENU, NEXT }
 
+/** Light is black on white, dark is white on black; system follows the device's dark theme. */
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
+
 class ReaderPreferences(context: Context) {
 	private val prefs = context.getSharedPreferences("squidread", Context.MODE_PRIVATE)
 
@@ -34,6 +37,10 @@ class ReaderPreferences(context: Context) {
 			return stored?.takeIf { it.size == 9 } ?: DEFAULT_ZONES
 		}
 		set(value) = prefs.edit { putString(ZONES, value.joinToString(",") { it.name }) }
+
+	var theme: ThemeMode
+		get() = enumOrDefault(prefs.getString(THEME, null), ThemeMode.SYSTEM)
+		set(value) = prefs.edit { putString(THEME, value.name) }
 
 	var lastBookId: String?
 		get() = prefs.getString(LAST_BOOK, null)
@@ -65,6 +72,7 @@ class ReaderPreferences(context: Context) {
 		private const val FONTS_CACHE = "fontsCache"
 		private const val CRASHED = "crashed"
 		private const val ZONES = "zones"
+		private const val THEME = "theme"
 		private const val LAST_BOOK = "lastBookId"
 
 		private val DEFAULT_ZONES = List(3) { listOf(ZoneAction.PREV, ZoneAction.MENU, ZoneAction.NEXT) }.flatten()

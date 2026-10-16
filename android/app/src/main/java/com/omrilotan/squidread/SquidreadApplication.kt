@@ -4,6 +4,7 @@ import android.app.Application
 import android.webkit.CookieManager
 import android.webkit.WebSettings
 import android.webkit.WebStorage
+import androidx.appcompat.app.AppCompatDelegate
 
 class SquidreadApplication : Application() {
 	val prefs by lazy { ReaderPreferences(this) }
@@ -22,6 +23,18 @@ class SquidreadApplication : Application() {
 	override fun onCreate() {
 		super.onCreate()
 		watchForCrashes()
+		applyTheme()
+	}
+
+	/** Sets every screen to [ReaderPreferences.theme]; open ones are recreated if it changes. */
+	fun applyTheme() {
+		AppCompatDelegate.setDefaultNightMode(
+			when (prefs.theme) {
+				ThemeMode.SYSTEM -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+				ThemeMode.LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
+				ThemeMode.DARK -> AppCompatDelegate.MODE_NIGHT_YES
+			},
+		)
 	}
 
 	/**

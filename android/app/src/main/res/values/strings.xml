@@ -21,10 +21,14 @@
   <string name="no_contents">Open a book to see its table of contents.</string>
   <string name="no_toc">This book has no table of contents.</string>
   <string name="zones_heading">Tap zone actions</string>
-  <string name="zones_hint">Tap a zone to cycle its action. For right-to-left books, "next" and "previous" are swapped.</string>
+  <string name="zones_hint">Tap a zone to cycle its action. For right-to-left books, the grid is mirrored.</string>
   <string name="zone_prev">‹ Prev</string>
   <string name="zone_next">Next ›</string>
   <string name="zone_menu">Menu</string>
+  <string name="theme_heading">Theme</string>
+  <string name="theme_system">System</string>
+  <string name="theme_light">Light</string>
+  <string name="theme_dark">Dark</string>
   <string name="version_label">Version %1$s</string>
   <string name="website">Website</string>
   <string name="privacy">Privacy policy</string>

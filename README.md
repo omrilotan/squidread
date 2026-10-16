@@ -22,7 +22,7 @@ Reading ePub files
 
 - Rendering uses the [Readium Kotlin toolkit](https://github.com/readium/kotlin-toolkit). EPUB content is HTML, so pages are drawn by a WebView; everything else (unzipping, library, menus, gestures, page turns) is native.
 - Right-to-left books follow the book's page progression, or its language when that is missing. Tap zones and arrow keys mirror for RTL books, as in the web app.
-- E-ink: pure black on white, no animations, ripples or shadows; page turns are instant, by tap, swipe or page-turn button (`PAGE_UP`/`PAGE_DOWN`); the footer only redraws when its text changes; the system bars appear and disappear at once with the menu.
+- E-ink: pure black and white, inverted in the dark theme (Settings: System, the default, Light or Dark), with no animations, ripples or shadows; page turns are instant, by tap, swipe or page-turn button (`PAGE_UP`/`PAGE_DOWN`); the footer only redraws when its text changes; the system bars appear and disappear at once with the menu.
 - Links: footnotes open over the page; Back returns to where a link was followed from. Books can't open other apps or the web on their own: only web and mail links the reader taps open, in another app.
 - Opens EPUB files only, without DRM. Malformed or hostile files are rejected when imported or opened rather than crashing the app.
 - Fonts: the styles menu can replace the book's fonts with any `.ttf`, `.otf`, `.woff` or `.woff2` file from the `fonts` folder at the root of the device's storage (where e-ink readers keep theirs). Android asks once for access to that folder. Files named like `Family-Bold.ttf` or `Family Bold Italic.ttf` are grouped into one family.
@@ -31,4 +31,4 @@ Reading ePub files
 
 Requires JDK 17+ and the Android SDK (set `sdk.dir` in `android/local.properties` or `ANDROID_HOME`).
 
-`make android-release` builds the APK; `make android-bundle` builds the App Bundle for Google Play. `android/play/` holds the store listing, graphics and Play Console answers.
+`make android-release` builds the APK; `make android-bundle` builds the App Bundle for Google Play. Bump `versionCode` and `versionName` in `android/app/build.gradle.kts` for every release, and add its notes to [CHANGELOG.md](CHANGELOG.md).

@@ -125,8 +125,7 @@ let readerAspectPreset = 'fullscreen';
 let readerAspectDirection = 'device';
 
 // Zone action mapping: row/col -> action ('prev', 'next', or 'menu')
-// Note: 'next' and 'prev' actions flip when the book direction is RTL (Right to Left)
-// For RTL books, users should configure zones accordingly (e.g., left zones for 'next', right zones for 'prev')
+// Zones are configured for left-to-right books; the grid is mirrored for RTL (Right to Left) books
 let selectedZoneForConfig = null;
 function getDefaultZoneMap() {
   return {
@@ -1273,27 +1272,24 @@ function handleViewerZoneClick(clientX, clientY) {
   log.debug('Viewer click at:', { x, y, width, height });
   if (x < 0 || y < 0 || x > width || y > height) return;
 
-  const col = getZoneIndex(x, width);
+  // Zones are configured for left-to-right books; mirror the grid for RTL,
+  // so each action keeps its meaning and moves to the opposite side.
+  const tappedCol = getZoneIndex(x, width);
+  const col = isRTL ? 2 - tappedCol : tappedCol;
   const row = getZoneIndex(y, height);
-  let action = getZoneAction(row, col);
+  const action = getZoneAction(row, col);
   log.debug('Viewer zone click:', { x, y, col, row, action });
   if (!action) return;
 
-  // Flip action for execution if RTL
-  let effectiveAction = action;
-  if (isRTL && (action === 'next' || action === 'prev')) {
-    effectiveAction = action === 'next' ? 'prev' : 'next';
-  }
-
-  if (effectiveAction === 'menu') {
+  if (action === 'menu') {
     openPanel();
     return;
   }
-  if (effectiveAction === 'next') {
+  if (action === 'next') {
     goNextPage();
     return;
   }
-  if (effectiveAction === 'prev') {
+  if (action === 'prev') {
     goPrevPage();
   }
 }

@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.Configuration
-import android.graphics.Color as AndroidColor
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -118,6 +117,10 @@ class MainActivity : AppCompatActivity() {
 	private lateinit var sectionViews: Map<Section, View>
 	private lateinit var tabViews: Map<Section, View>
 	private var zoneButtons: List<TextView> = emptyList()
+	private var themeButtons: Map<ThemeMode, TextView> = emptyMap()
+
+	/** Whether the screen was built in the dark theme; it is built again when that changes. */
+	private var isNight = false
 
 	private val tocAdapter = TocAdapter { entry -> navigateTo(entry) }
 	private lateinit var libraryAdapter: LibraryAdapter
@@ -212,6 +215,7 @@ class MainActivity : AppCompatActivity() {
 		val taskBook = taskBookId?.let { library.get(it) }
 		val opening = taskBook?.let(::startOpening)
 
+		isNight = isNightMode()
 		setContentView(R.layout.activity_main)
 		bindViews()
 		setUpWindow()
@@ -242,6 +246,15 @@ class MainActivity : AppCompatActivity() {
 			// Shows the library once, with its covers.
 			window.decorView.holdDrawing(lifecycleScope, LIBRARY_WAIT_MS) { preloadCovers() }
 		}
+		// Rebuilt for a new theme: back to the menu section that was showing, usually Settings.
+		savedInstanceState?.getString(MENU_SECTION)
+			?.let { name -> Section.entries.firstOrNull { it.name == name } }
+			?.let(::openMenu)
+	}
+
+	override fun onSaveInstanceState(outState: Bundle) {
+		super.onSaveInstanceState(outState)
+		if (menu.isVisible) outState.putString(MENU_SECTION, section.name)
 	}
 
 	override fun onNewIntent(intent: Intent) {
@@ -308,6 +321,11 @@ class MainActivity : AppCompatActivity() {
 
 	override fun onConfigurationChanged(newConfig: Configuration) {
 		super.onConfigurationChanged(newConfig)
+		// Every view takes its colours when built, so a new theme builds the screen again.
+		if (isNightMode() != isNight) {
+			recreate()
+			return
+		}
 		// Rotation is handled in place; pick up the margins and columns for the new shape.
 		val top = resources.getDimensionPixelSize(R.dimen.reader_padding_top)
 		val bottom = resources.getDimensionPixelSize(R.dimen.reader_padding_bottom)
@@ -377,7 +395,7 @@ class MainActivity : AppCompatActivity() {
 	/**
 	 * The system bars are hidden while reading and shown only with the menu. They draw over the
 	 * reader rather than resizing it, so showing them never re-paginates the book; only the
-	 * menu makes room for them, with white scrims behind the bars.
+	 * menu makes room for them, with scrims in the page colour behind the bars.
 	 */
 	private fun setUpWindow() {
 		val root = findViewById<View>(R.id.root)
@@ -385,8 +403,8 @@ class MainActivity : AppCompatActivity() {
 		systemBars = WindowInsetsControllerCompat(window, root).apply {
 			hide(WindowInsetsCompat.Type.systemBars())
 			systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-			isAppearanceLightStatusBars = true
-			isAppearanceLightNavigationBars = true
+			isAppearanceLightStatusBars = !isNight
+			isAppearanceLightNavigationBars = !isNight
 		}
 		val scrims = listOf(R.id.bar_scrim_top, R.id.bar_scrim_bottom, R.id.bar_scrim_left, R.id.bar_scrim_right)
 			.map { findViewById<View>(it) }
@@ -526,6 +544,25 @@ class MainActivity : AppCompatActivity() {
 		if (settingsBuilt) return
 		settingsBuilt = true
 		val content = findViewById<LinearLayout>(R.id.settings_content)
+		content.addView(heading(R.string.theme_heading))
+		val themes = LinearLayout(this)
+		themeButtons = listOf(
+			ThemeMode.SYSTEM to R.string.theme_system,
+			ThemeMode.LIGHT to R.string.theme_light,
+			ThemeMode.DARK to R.string.theme_dark,
+		).associate { (mode, text) ->
+			mode to button(getString(text)) { chooseTheme(mode) }.also { view ->
+				themes.addView(
+					view,
+					LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+						setMargins(dp(4), dp(4), dp(4), dp(4))
+					},
+				)
+			}
+		}
+		content.addView(themes, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+		updateThemeButtons()
+
 		content.addView(heading(R.string.zones_heading))
 		val grid = GridLayout(this).apply {
 			columnCount = 3
@@ -966,10 +1003,10 @@ class MainActivity : AppCompatActivity() {
 		fontFamily = currentFontFamily()?.takeIf { it in declaredFamilies }?.let(::FontFamily),
 		spread = Spread.NEVER,
 		scroll = false,
-		theme = Theme.LIGHT,
+		theme = if (isNight) Theme.DARK else Theme.LIGHT,
 		// Maximum contrast for e-ink, whatever greys the book asks for.
-		textColor = Color(AndroidColor.BLACK),
-		backgroundColor = Color(AndroidColor.WHITE),
+		textColor = Color(ContextCompat.getColor(this, R.color.ink)),
+		backgroundColor = Color(ContextCompat.getColor(this, R.color.paper)),
 	)
 
 	// --- Navigation ------------------------------------------------------------
@@ -1051,18 +1088,14 @@ class MainActivity : AppCompatActivity() {
 
 		val column = (x / width * 3).toInt().coerceIn(0, 2)
 		val row = (y / height * 3).toInt().coerceIn(0, 2)
-		when (effectiveAction(prefs.zones[row * 3 + column])) {
+		// Zones are configured for left-to-right books; mirror the grid for right-to-left,
+		// so each action keeps its meaning and moves to the opposite side.
+		val zone = if (isRtl()) 2 - column else column
+		when (prefs.zones[row * 3 + zone]) {
 			ZoneAction.MENU -> openMenu()
 			ZoneAction.NEXT -> goNext()
 			ZoneAction.PREV -> goPrevious()
 		}
-	}
-
-	/** Zones are configured for left-to-right books; mirror next and previous for right-to-left. */
-	private fun effectiveAction(action: ZoneAction): ZoneAction = when {
-		!isRtl() || action == ZoneAction.MENU -> action
-		action == ZoneAction.NEXT -> ZoneAction.PREV
-		else -> ZoneAction.NEXT
 	}
 
 	private fun handleKey(keyCode: Int): Boolean {
@@ -1297,6 +1330,21 @@ class MainActivity : AppCompatActivity() {
 		updateZoneButtons()
 	}
 
+	private fun chooseTheme(mode: ThemeMode) {
+		if (prefs.theme == mode) return
+		prefs.theme = mode
+		updateThemeButtons()
+		// Screens whose colours change are rebuilt, through onConfigurationChanged.
+		app.applyTheme()
+	}
+
+	private fun updateThemeButtons() {
+		themeButtons.forEach { (mode, view) -> view.isSelected = mode == prefs.theme }
+	}
+
+	private fun isNightMode() =
+		resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+
 	private fun updateZoneButtons() {
 		prefs.zones.forEachIndexed { index, action ->
 			zoneButtons.getOrNull(index)?.setText(
@@ -1338,7 +1386,7 @@ class MainActivity : AppCompatActivity() {
 
 	private fun label(text: String) = TextView(this).apply {
 		this.text = text
-		setTextColor(AndroidColor.BLACK)
+		setTextColor(ContextCompat.getColor(context, R.color.ink))
 		textSize = 15f
 		gravity = android.view.Gravity.CENTER
 		setPadding(0, dp(12), 0, dp(8))
@@ -1353,6 +1401,7 @@ class MainActivity : AppCompatActivity() {
 	private companion object {
 		const val TAG = "Squidread"
 		const val NAVIGATOR_TAG = "navigator"
+		const val MENU_SECTION = "menuSection"
 		const val LICENSES_ASSET = "licenses.txt"
 		const val LOADING_TIMEOUT_MS = 10_000L
 		const val COVER_WAIT_MS = 150L

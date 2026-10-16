@@ -93,6 +93,11 @@ h1 {
 	color: var(--ink);
 }
 
+/* Not yet available: shown, but not a link. */
+.button[aria-disabled='true'] {
+	pointer-events: none;
+}
+
 .note {
 	max-width: 30em;
 	margin: 16px auto 0;
@@ -306,7 +311,7 @@ footer a {
 	}
 }
 
-/* --- Desktop: all four screenshots in a row, three feature cards across ------------- */
+/* --- Desktop: all five screenshots in a row, three feature cards across ------------- */
 
 @media (min-width: 960px) {
 	.hero {
@@ -319,7 +324,7 @@ footer a {
 
 	.screenshots ul {
 		grid-auto-flow: row;
-		grid-template-columns: repeat(4, minmax(0, 1fr));
+		grid-template-columns: repeat(5, minmax(0, 1fr));
 		overflow: visible;
 	}
 

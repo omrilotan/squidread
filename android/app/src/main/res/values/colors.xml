@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Only two colours, swapped in the dark theme: no greys on e-ink. -->
+  <color name="ink">#000000</color>
+  <color name="paper">#FFFFFF</color>
+</resources>
