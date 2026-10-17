@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Font size preview: paper margins around a framed, see-through window onto the book. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+  <item android:gravity="top|fill_horizontal" android:height="16dp">
+    <shape><solid android:color="@color/paper" /></shape>
+  </item>
+  <item android:gravity="start|fill_vertical" android:width="16dp">
+    <shape><solid android:color="@color/paper" /></shape>
+  </item>
+  <item android:gravity="end|fill_vertical" android:width="16dp">
+    <shape><solid android:color="@color/paper" /></shape>
+  </item>
+  <item android:drawable="@drawable/preview_window" android:end="16dp" android:start="16dp" android:top="16dp" />
+</layer-list>

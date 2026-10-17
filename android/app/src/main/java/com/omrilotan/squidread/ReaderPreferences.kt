@@ -42,6 +42,11 @@ class ReaderPreferences(context: Context) {
 		get() = enumOrDefault(prefs.getString(THEME, null), ThemeMode.SYSTEM)
 		set(value) = prefs.edit { putString(THEME, value.name) }
 
+	/** Whether the welcome screen, on how to make Squidread the default reader, was shown. */
+	var welcomed: Boolean
+		get() = prefs.getBoolean(WELCOMED, false)
+		set(value) = prefs.edit { putBoolean(WELCOMED, value) }
+
 	var lastBookId: String?
 		get() = prefs.getString(LAST_BOOK, null)
 		set(value) = prefs.edit { putString(LAST_BOOK, value) }
@@ -74,6 +79,7 @@ class ReaderPreferences(context: Context) {
 		private const val ZONES = "zones"
 		private const val THEME = "theme"
 		private const val LAST_BOOK = "lastBookId"
+		private const val WELCOMED = "welcomed"
 
 		private val DEFAULT_ZONES = List(3) { listOf(ZoneAction.PREV, ZoneAction.MENU, ZoneAction.NEXT) }.flatten()
 	}

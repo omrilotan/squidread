@@ -40,11 +40,22 @@
     <item name="android:focusable">true</item>
   </style>
 
+  <!-- Menu tabs share one row: shrink the label to fit rather than break it across lines,
+       as happens with large display or font sizes. -->
+  <style name="Squidread.Tab" parent="Squidread.Button">
+    <item name="android:paddingStart">4dp</item>
+    <item name="android:paddingEnd">4dp</item>
+    <item name="android:maxLines">1</item>
+    <item name="autoSizeTextType">uniform</item>
+    <item name="autoSizeMinTextSize">10sp</item>
+    <item name="autoSizeMaxTextSize">16sp</item>
+  </style>
+
   <style name="Squidread.Heading" parent="">
     <item name="android:textSize">18sp</item>
     <item name="android:textStyle">bold</item>
     <item name="android:textColor">@color/ink</item>
-    <item name="android:paddingTop">20dp</item>
+    <item name="android:paddingTop">16dp</item>
     <item name="android:paddingBottom">8dp</item>
   </style>
 </resources>

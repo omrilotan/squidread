@@ -92,11 +92,13 @@ class GuardedWebViewClient(
 	@RequiresApi(Build.VERSION_CODES.O_MR1)
 	override fun onSafeBrowsingHit(view: WebView, request: WebResourceRequest, threatType: Int, callback: SafeBrowsingResponse) =
 		inner.onSafeBrowsingHit(view, request, threatType, callback)
-
-	companion object {
-		/** The origins Readium serves the book and its own scripts from. */
-		private val BOOK_HOSTS = setOf("readium_package", "readium_assets")
-
-		fun isInBook(url: Uri): Boolean = url.scheme == "https" && url.host in BOOK_HOSTS
-	}
 }
+
+/** The origins Readium serves the book and its own scripts from. */
+private val BOOK_HOSTS = setOf("readium_package", "readium_assets")
+
+/**
+ * Whether [url] is part of the book. Outside [GuardedWebViewClient], which needs API 26, so
+ * links can be checked on every Android version the app runs on.
+ */
+fun isInBook(url: Uri): Boolean = url.scheme == "https" && url.host in BOOK_HOSTS

@@ -1,5 +1,6 @@
 package com.omrilotan.squidread
 
+import android.annotation.SuppressLint
 import android.graphics.Typeface
 import android.view.LayoutInflater
 import android.view.View
@@ -14,7 +15,10 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
-/** "Add EPUB" tile followed by the books, most recently opened first. */
+/**
+ * "Add EPUB" tile followed by the books, most recently opened first. While there are no books,
+ * [emptyHint] follows the tile, across the whole row.
+ */
 class LibraryAdapter(
 	private val library: Library,
 	private val covers: CoverCache,
@@ -22,10 +26,15 @@ class LibraryAdapter(
 	private val onAdd: () -> Unit,
 	private val onOpen: (Book) -> Unit,
 	private val onDelete: (Book) -> Unit,
+	private val emptyHint: CharSequence,
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 	private var books: List<Book> = emptyList()
 	private var currentId: String? = null
 
+	// The order follows the last opened book and the open book's title is marked, so most tiles
+	// can move or change. With item animations off, one full rebind is a single redraw, which is
+	// what e-ink wants; working out the smallest change would cost more than it saves.
+	@SuppressLint("NotifyDataSetChanged")
 	fun refresh(current: String?) {
 		books = library.all()
 		currentId = current
@@ -41,12 +50,24 @@ class LibraryAdapter(
 		Unit
 	}
 
-	override fun getItemCount() = books.size + 1
+	override fun getItemCount() = if (books.isEmpty()) 2 else books.size + 1
 
-	override fun getItemViewType(position: Int) = if (position == 0) TYPE_ADD else TYPE_BOOK
+	override fun getItemViewType(position: Int) = when {
+		position == 0 -> TYPE_ADD
+		books.isEmpty() -> TYPE_HINT
+		else -> TYPE_BOOK
+	}
+
+	/** Whether the item at [position] takes a whole row of the grid. */
+	fun isFullRow(position: Int) = getItemViewType(position) == TYPE_HINT
 
 	override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
 		val inflater = LayoutInflater.from(parent.context)
+		if (viewType == TYPE_HINT) {
+			val hint = inflater.inflate(R.layout.item_library_hint, parent, false) as TextView
+			hint.text = emptyHint
+			return object : RecyclerView.ViewHolder(hint) {}
+		}
 		val view = inflater.inflate(R.layout.item_library, parent, false)
 		return if (viewType == TYPE_ADD) AddHolder(view) else BookHolder(view)
 	}
@@ -97,5 +118,6 @@ class LibraryAdapter(
 	private companion object {
 		const val TYPE_ADD = 0
 		const val TYPE_BOOK = 1
+		const val TYPE_HINT = 2
 	}
 }

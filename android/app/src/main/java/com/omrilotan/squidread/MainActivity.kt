@@ -103,6 +103,7 @@ class MainActivity : AppCompatActivity() {
 	private lateinit var chapterInfoView: TextView
 	private lateinit var progressView: TextView
 	private lateinit var menu: View
+	private lateinit var welcome: View
 	private lateinit var systemBars: WindowInsetsControllerCompat
 	private lateinit var barScrims: List<View>
 	private lateinit var menuTitle: TextView
@@ -228,6 +229,7 @@ class MainActivity : AppCompatActivity() {
 		onBackPressedDispatcher.addCallback(this) {
 			val nav = navigator
 			when {
+				welcome.isVisible -> closeWelcome()
 				menu.isVisible -> closeMenu()
 				nav != null && linkHistory.isNotEmpty() -> nav.go(linkHistory.removeAt(linkHistory.lastIndex), animated = false)
 				else -> moveTaskToBack(true)
@@ -243,6 +245,11 @@ class MainActivity : AppCompatActivity() {
 				taskBookId = null
 			}
 			openMenu(Section.LIBRARY)
+			// First run: how to make Squidread the default reader. Anyone with books already
+			// found their way in, so it's skipped for them.
+			if (!prefs.welcomed) {
+				if (library.all().isEmpty()) welcome.isVisible = true else prefs.welcomed = true
+			}
 			// Shows the library once, with its covers.
 			window.decorView.holdDrawing(lifecycleScope, LIBRARY_WAIT_MS) { preloadCovers() }
 		}
@@ -422,6 +429,7 @@ class MainActivity : AppCompatActivity() {
 			val right = (bars.right - cutout.right).coerceAtLeast(0)
 			val bottom = (bars.bottom - cutout.bottom).coerceAtLeast(0)
 			menu.updatePadding(left = left, top = top, right = right, bottom = bottom)
+			welcome.updatePadding(left = left, top = top, right = right, bottom = bottom)
 			scrims[0].setSize(height = top)
 			scrims[1].setSize(height = bottom)
 			scrims[2].setSize(width = left)
@@ -450,6 +458,15 @@ class MainActivity : AppCompatActivity() {
 		chapterInfoView = findViewById(R.id.chapter_info)
 		progressView = findViewById(R.id.progress)
 		menu = findViewById(R.id.menu)
+		welcome = findViewById(R.id.welcome)
+		findViewById<View>(R.id.welcome_start).apply {
+			isSelected = true
+			setOnClickListener { closeWelcome() }
+		}
+		findViewById<TextView>(R.id.welcome_tip).setText(if (isBoox) R.string.welcome_tip_boox else R.string.welcome_tip_android)
+		findViewById<View>(R.id.welcome_more).setOnClickListener {
+			openExternal(Uri.parse(getString(R.string.default_url)))
+		}
 		menuTitle = findViewById(R.id.menu_title)
 		fontSizeValue = findViewById(R.id.font_size_value)
 		fontPicker = findViewById(R.id.font_picker)
@@ -517,8 +534,13 @@ class MainActivity : AppCompatActivity() {
 				}
 			},
 			onDelete = { selected -> confirmDelete(selected) },
+			emptyHint = getString(if (isBoox) R.string.library_hint_boox else R.string.library_hint_android),
 		)
-		libraryList.layoutManager = GridLayoutManager(this, libraryColumns())
+		libraryList.layoutManager = GridLayoutManager(this, libraryColumns()).apply {
+			spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+				override fun getSpanSize(position: Int) = if (libraryAdapter.isFullRow(position)) spanCount else 1
+			}
+		}
 		libraryList.itemAnimator = null
 		libraryList.adapter = libraryAdapter
 	}
@@ -545,7 +567,11 @@ class MainActivity : AppCompatActivity() {
 		settingsBuilt = true
 		val content = findViewById<LinearLayout>(R.id.settings_content)
 		content.addView(heading(R.string.theme_heading))
-		val themes = LinearLayout(this)
+		val themes = LinearLayout(this).apply {
+			// Room for the outer half of the shared borders, which overlap the row's edge.
+			setPadding(dp(1), 0, dp(1), 0)
+			clipToPadding = false
+		}
 		themeButtons = listOf(
 			ThemeMode.SYSTEM to R.string.theme_system,
 			ThemeMode.LIGHT to R.string.theme_light,
@@ -554,12 +580,11 @@ class MainActivity : AppCompatActivity() {
 			mode to button(getString(text)) { chooseTheme(mode) }.also { view ->
 				themes.addView(
 					view,
-					LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-						setMargins(dp(4), dp(4), dp(4), dp(4))
-					},
+					LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(-dp(1), 0, -dp(1), 0) },
 				)
 			}
 		}
+		// Segmented, like the tabs: neighbouring buttons overlap by a border's width and share it.
 		content.addView(themes, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 		updateThemeButtons()
 
@@ -567,6 +592,9 @@ class MainActivity : AppCompatActivity() {
 		val grid = GridLayout(this).apply {
 			columnCount = 3
 			rowCount = 3
+			// Room for the outer half of the shared borders, which overlap the grid's edge.
+			setPadding(dp(1), dp(1), dp(1), dp(1))
+			clipToPadding = false
 		}
 		zoneButtons = List(9) { index ->
 			button("") { cycleZone(index) }.also { view ->
@@ -577,8 +605,8 @@ class MainActivity : AppCompatActivity() {
 						GridLayout.spec(index % 3, 1f),
 					).apply {
 						width = 0
-						height = dp(72)
-						setMargins(dp(4), dp(4), dp(4), dp(4))
+						height = dp(64)
+						setMargins(-dp(1), -dp(1), -dp(1), -dp(1))
 					},
 				)
 			}
@@ -588,8 +616,14 @@ class MainActivity : AppCompatActivity() {
 		updateZoneButtons()
 
 		content.addView(heading(R.string.app_name))
-		content.addView(label(getString(R.string.version_label, packageManager.getPackageInfo(packageName, 0).versionName)))
-		val links = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+		content.addView(
+			label(getString(R.string.version_label, packageManager.getPackageInfo(packageName, 0).versionName)).apply {
+				gravity = android.view.Gravity.START
+				setPadding(0, 0, 0, dp(12))
+			},
+			LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT),
+		)
+		val links = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
 			topMargin = dp(8)
 		}
 		content.addView(button(getString(R.string.website)) { openExternal(Uri.parse(getString(R.string.website_url))) }, links)
@@ -1166,6 +1200,11 @@ class MainActivity : AppCompatActivity() {
 		setSystemBarsVisible(true)
 	}
 
+	private fun closeWelcome() {
+		welcome.isVisible = false
+		prefs.welcomed = true
+	}
+
 	private fun closeMenu() {
 		pendingJump?.cancel()
 		pendingJump = null
@@ -1364,7 +1403,7 @@ class MainActivity : AppCompatActivity() {
 	 * apps' own schemes, the book's internal addresses, absurdly long URLs) is ignored.
 	 */
 	private fun openExternal(uri: Uri) {
-		if (uri.scheme?.lowercase() !in EXTERNAL_SCHEMES || GuardedWebViewClient.isInBook(uri)) return
+		if (uri.scheme?.lowercase() !in EXTERNAL_SCHEMES || isInBook(uri)) return
 		if (uri.toString().length > MAX_LINK_LENGTH) return
 		try {
 			startActivity(Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE))
@@ -1421,5 +1460,8 @@ class MainActivity : AppCompatActivity() {
 		const val LIBRARY_TITLE_DP = 48
 		val EXTERNAL_SCHEMES = setOf("http", "https", "mailto")
 		val EPUB_MIME_TYPES = arrayOf("application/epub+zip", "application/octet-stream", "application/zip")
+
+		/** Boox devices are made by Onyx; their library sets the default reader its own way. */
+		val isBoox = Build.MANUFACTURER.equals("ONYX", ignoreCase = true) || Build.BRAND.equals("BOOX", ignoreCase = true)
 	}
 }

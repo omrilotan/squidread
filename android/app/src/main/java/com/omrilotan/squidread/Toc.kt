@@ -1,5 +1,6 @@
 package com.omrilotan.squidread
 
+import android.annotation.SuppressLint
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.TextView
@@ -62,6 +63,8 @@ class TocAdapter(private val onSelect: (TocEntry) -> Unit) : RecyclerView.Adapte
 	var topLevelCount = 0
 		private set
 
+	// A new book replaces every entry; there's nothing finer to report.
+	@SuppressLint("NotifyDataSetChanged")
 	fun submit(items: List<TocEntry>) {
 		entries = items
 		topLevelCount = items.count { it.depth == 0 }
