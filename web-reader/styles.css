@@ -1,22 +1,35 @@
+/*
+ * Same look as the Android app: two colours only (ink and paper, swapped in the dark theme),
+ * 2px square borders, selected and pressed controls inverted, no shadows, no animations.
+ * Meant to read well on e-ink, where greys smear and every transition is a slow refresh.
+ */
+
 * {
   box-sizing: border-box;
 }
 
 :root {
-  --bg: #fff;
-  --panel: #fff;
-  --card: #fff;
-  --accent: #7dd3fc;
-  --accent-strong: #22d3ee;
-  --text: #000;
-  --muted: #333;
-  --border: #ccc;
-  color-scheme: light;
-  --footer-height: 36px;
-  --panel-background: rgba(255, 255, 255, 1);
-  --viewer-bg: #fff;
-  --max-width-setting-box: 300px;
+  --ink: #000;
+  --paper: #fff;
+  --line: 2px;
+  --gap: 16px;
+  --footer-height: 40px;
   --viewport-height: 100vh;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #fff;
+    --paper: #000;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ink: #fff;
+  --paper: #000;
+  color-scheme: dark;
 }
 
 @supports (height: 100dvh) {
@@ -27,34 +40,91 @@
 
 body {
   margin: 0;
-  font-family: 'Space Grotesk', 'Helvetica Neue', sans-serif;
-  background: var(--bg);
-  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  font-size: 16px;
+  background: var(--paper);
+  color: var(--ink);
   min-height: var(--viewport-height);
 }
 
-.topbar {
+a {
+  color: inherit;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* --- Controls ---------------------------------------------------------------- */
+
+button,
+input {
+  font: inherit;
+}
+
+button,
+.linkButton {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel-background);
-  backdrop-filter: blur(10px);
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 12px;
+  border: var(--line) solid var(--ink);
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.brand {
-  font-weight: 600;
-  letter-spacing: 0.04em;
+button:active,
+.linkButton:active,
+button[aria-pressed="true"],
+button.active {
+  background: var(--ink);
+  color: var(--paper);
 }
 
-.status {
-  color: var(--muted);
-  font-size: 0.95rem;
+button:disabled,
+button:disabled:active {
+  border: 1px dashed var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: default;
 }
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: var(--line) solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* A row of buttons sharing their borders: each overlaps its neighbour by one line. */
+.segmented {
+  display: flex;
+}
+
+.segmented > button {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.segmented > button + button {
+  margin-inline-start: calc(-1 * var(--line));
+}
+
+.panel h3 {
+  margin: var(--gap) 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* --- Menu -------------------------------------------------------------------- */
 
 .layout {
   display: grid;
@@ -67,104 +137,90 @@ body {
 
 .panel {
   position: fixed;
-  top: 0;
-  left: 0;
+  inset: 0 auto auto 0;
   width: 100%;
   height: var(--viewport-height);
-  background: transparent;
-  padding: 0;
   display: flex;
   flex-direction: column;
-  overflow-y: hidden;
+  overflow: hidden;
   z-index: 100;
-  transform: translateX(-100%);
 }
 
-.panel:not(.hidden) {
-  transform: translateX(0);
-}
-
-#stylesSection #stylesSection .stylesWindow {
-  position: fixed;
-  pointer-events: none;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 102;
+.panel.hidden {
+  display: none !important;
 }
 
 .panelHeader {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: .25em .5em;
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  background: var(--panel-background);
-  z-index: 101;
-}
-
-.panelHeader h2 {
-  margin: 0;
-  flex: 1;
-  text-align: center;
-}
-
-.panelHeader button {
-  padding: 8px 12px;
-  font-size: 1.2rem;
-  border-radius: 50%;
+  gap: 12px;
+  padding: 12px var(--gap);
+  background: var(--paper);
 }
 
 .panelIcon {
-  width: 32px;
-  height: 32px;
-  image-rendering: pixelated;
-  display: block;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  /* The mascot is a black drawing: it keeps its own white disc in the dark theme. */
+  border-radius: 50%;
+  background: #fff;
 }
 
+.panelHeader h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.closeButton {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  padding: 0;
+  font-size: 24px;
+}
+
+/* One segmented bar, edge to edge: the outer side borders fall off the screen. */
 .panelNav {
   display: flex;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel-background);
-  position: sticky;
-  top: 47px;
-  z-index: 100;
+  margin: 0 calc(-1 * var(--line));
+  background: var(--paper);
 }
 
 .navBtn {
-  flex: 1;
-  padding: 12px 16px;
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 500;
-  border-bottom: 2px solid transparent;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.navBtn.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
+.navBtn + .navBtn {
+  margin-inline-start: calc(-1 * var(--line));
 }
 
 .panelContent {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   user-select: none;
-  min-height: 0;
 }
 
 .panelSection {
   display: none;
-  padding: 16px;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  background: var(--panel-background);
+  padding: 0 var(--gap) var(--gap);
+  background: var(--paper);
 }
 
 .panelSection.active {
@@ -172,97 +228,198 @@ body {
   flex-direction: column;
 }
 
+.meta,
+.hint {
+  margin: var(--gap) 0 0;
+  line-height: 1.4;
+}
+
+.hint {
+  text-align: center;
+}
+
+/* --- Aa: font size ----------------------------------------------------------- */
+
 #stylesSection {
-  background: transparent;
   padding: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+/* See-through: the page shows inside the frame, paper all around it. */
+.stylesPreview {
+  flex: 1;
+  min-height: 120px;
+  margin: var(--gap) var(--gap) 0;
+  border: var(--line) solid var(--ink);
+  box-shadow: 0 0 0 100vmax var(--paper);
+  clip-path: inset(calc(-1 * var(--gap)) calc(-1 * var(--gap)) 0);
+}
+
+.stylesControls {
+  position: relative;
+  padding: 0 var(--gap) var(--gap);
+  background: var(--paper);
+  text-align: center;
+}
+
+.fontSizeControl {
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+.fontSizeControl > button {
+  font-size: 22px;
+}
+
+.fontSizeControl > button.wide {
+  flex-grow: 1.5;
+  font-size: inherit;
+}
+
+.fontSizeValue {
+  margin: 12px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Contents ---------------------------------------------------------------- */
+
+.tocList {
+  list-style: none;
+  margin: 0 calc(-1 * var(--gap));
+  padding: 0;
+}
+
+.tocList .meta {
+  margin: var(--gap);
+}
+
+.tocItem {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px var(--gap);
+  border: 0;
+  border-bottom: 1px solid var(--ink);
+  text-align: start;
+  line-height: 1.3;
+}
+
+.tocItem.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* --- Library ----------------------------------------------------------------- */
+
+.library {
+  list-style: none;
+  margin: var(--gap) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--gap);
+  align-items: start;
+}
+
+.libraryAddItem,
+.libraryItem {
+  position: relative;
+}
+
+.addEpubButton,
+.portraitBtn {
+  width: 100%;
+  padding: 12px;
+}
+
+.addEpubButton {
+  aspect-ratio: 2 / 3;
+  align-items: flex-end;
+}
+
+.portraitBtn {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.coverContainer {
+  aspect-ratio: 2 / 3;
+  display: flex;
   overflow: hidden;
 }
 
-.stylesTop,
-.stylesBottom {
-  flex: 1;
-  background: var(--panel-background);
+.coverContainer.noCover {
+  border: 1px solid currentColor;
 }
 
-.stylesBottom {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 16px;
-}
-
-.stylesMiddle {
-  flex: 2;
-  display: flex;
-  min-height: 0;
-}
-
-.stylesSide {
-  flex: 1;
-  background: var(--panel-background);
-}
-
-.stylesCenter {
-  flex: 8;
-  background: transparent;
-  border: 2px solid var(--accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-}
-
-.stylesContent {
-  padding: 16px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
+.coverImage {
   width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 
+.bookTitle {
+  font-weight: 700;
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Sits on the tile's corner, sharing its border. */
+.deleteBtn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 48px;
+  height: 48px;
+  min-height: 0;
+  padding: 0;
+  font-size: 20px;
+  z-index: 1;
+}
+
+/* --- Settings ---------------------------------------------------------------- */
+
 .settingsContent {
-  padding: 16px;
-  text-align: center;
+  display: flex;
+  flex-direction: column;
 }
 
 .settingsContent p {
-  margin: 0 0 12px 0;
-  color: var(--text);
-  line-height: 1.6;
+  margin: 0 0 12px;
 }
 
-.settingsContent a {
-  color: var(--accent);
-  text-decoration: none;
+.zoneGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0 var(--line) 0 0;
 }
 
-.settingsContent a#swRefreshLink {
-  display: inline-block;
-  margin-top: 4px;
+.zoneCell {
+  min-height: 72px;
+  margin: 0 calc(-1 * var(--line)) calc(-1 * var(--line)) 0;
 }
 
-.settingsContent a:hover {
-  color: var(--accent-strong);
+.linkButton + .linkButton {
+  margin-top: 8px;
 }
 
-.panel > .card {
-  margin: 16px;
-}
+/* --- Reader ------------------------------------------------------------------ */
 
 .reader {
   position: relative;
-  padding: 0 0 var(--footer-height) 0; /* Add bottom padding for footer */
+  padding: 0 0 var(--footer-height) 0;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   width: 100vw;
   max-width: 100%;
   height: var(--viewport-height);
-  box-sizing: border-box;
+  background: var(--paper);
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -277,6 +434,7 @@ body {
   height: 100%;
   max-width: 100%;
   margin: 0 auto;
+  background: var(--paper);
 }
 
 .viewer.hasAspectRatio {
@@ -286,6 +444,7 @@ body {
   height: auto;
   aspect-ratio: var(--reader-aspect-ratio);
   max-height: calc(var(--viewport-height) - var(--footer-height));
+  outline: 1px solid var(--ink);
 }
 
 .viewer iframe {
@@ -299,51 +458,23 @@ body {
 
 .viewerEmptyState {
   position: absolute;
-  inset: 0;
+  inset: 0 0 var(--footer-height);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: var(--gap);
   pointer-events: none;
   z-index: 2;
 }
 
-.viewerEmptyState.hidden {
-  display: none;
-}
-
-.viewerEmptyGraphic {
-  position: relative;
-  width: 120px;
-  height: 120px;
-  display: grid;
-  place-items: center;
-}
-
-.viewerEmptyCircle {
-  position: absolute;
-  border-radius: 999px;
-}
-
-.viewerEmptyCircleOuter {
-  inset: 0;
-  border: 2px solid var(--border);
-}
-
-.viewerEmptyCircleInner {
-  inset: 18px;
-  border: 2px dashed var(--accent);
-}
-
-.viewerEmptyBook {
-  font-size: 44px;
-  line-height: 1;
+.viewerEmptyLogo {
+  border-radius: 50%;
+  background: #fff;
 }
 
 .viewerEmptyText {
-  color: var(--muted);
-  font-weight: 500;
+  font-size: 18px;
 }
 
 .readerFooter {
@@ -351,16 +482,16 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
+  height: var(--footer-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  font-size: 0.85rem;
-  color: var(--muted);
+  gap: 12px;
+  padding: 0 var(--gap);
+  border-top: 1px solid var(--ink);
+  background: var(--paper);
+  font-size: 14px;
   z-index: 5;
-  height: var(--footer-height);
 }
 
 .footerLeft,
@@ -368,398 +499,63 @@ body {
 .footerRight {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
 }
 
-.footerLeft {
-  flex: 0 0 auto;
-  justify-content: flex-start;
+.footerLeft,
+.footerRight {
+  flex: none;
 }
 
 .footerCenter {
   flex: 1 1 auto;
   justify-content: center;
-  text-align: center;
-  font-weight: 500;
   min-width: 0;
+  font-weight: 700;
 }
 
-.footerRight {
-  flex: 0 0 auto;
-  justify-content: flex-end;
-}
-
-.footerBtn {
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  cursor: pointer;
-  padding: 4px 8px;
-  font-size: 1rem;
-  opacity: 0.7;
-}
-
-.footerBtn:hover {
-  opacity: 1;
-}
-
-.clock {
+.clock,
+.progressPercent,
+.chapterNumber {
   font-variant-numeric: tabular-nums;
-  color: var(--text);
 }
 
 .chapterInfo {
-  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 60vw;
   cursor: pointer;
 }
 
-.progressPercent {
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-  font-weight: 500;
-}
+/* --- Feedback ---------------------------------------------------------------- */
 
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px;
-  margin-bottom: 14px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
-}
-
-h2 {
-  margin: 0 0 10px;
-  font-size: 1rem;
-}
-
-.stack {
-  display: grid;
-  gap: 10px;
-}
-
-.fileInput {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px;
-  border: 1px dashed var(--border);
-  border-radius: 10px;
-  cursor: pointer;
-  color: var(--muted);
-
-}
-
-.fileInput:hover {
-  border-color: var(--accent);
-  color: var(--text);
-}
-
-.fileInput input {
-  display: none;
-}
-
-input, button {
-  font-family: inherit;
-}
-
-input[type="url"] {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: #0c1320;
-  color: var(--text);
-}
-
-button {
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  background: #121b2b;
-  color: var(--text);
-  cursor: pointer;
-  outline: none;
-}
-
-button.active {
-  border-color: var(--accent);
-}
-
-button.primary {
-  background: linear-gradient(120deg, var(--accent), var(--accent-strong));
-  color: #08101d;
-  border-color: transparent;
-  font-weight: 600;
-}
-
-button.ghost {
-  background: transparent;
-  border-color: var(--border);
-  padding: 6px 11px;
-}
-
-.library {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 12px;
-}
-
-.libraryItem {
-  position: relative;
-  border-radius: 8px;
-  overflow: hidden;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-
-.libraryItem::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.7) 100%);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.libraryAddItem, .libraryItem {
-  position: relative;
-  height: 260px;
-}
-
-.addEpubButton {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 0;
-  border: 2px dashed var(--border);
-  border-radius: 8px;
-  background: transparent;
-  cursor: pointer;
-  width: 100%;
-  height: 100%;
-}
-
-.addEpubButton:hover {
-  border-color: var(--accent);
-  background: rgba(125, 211, 252, 0.05);
-}
-
-.addEpubPlus {
-  font-size: 48px;
-  color: var(--accent);
-  font-weight: 500;
-  line-height: 1;
-}
-
-.addEpubText {
-  font-size: 16px;
-  color: var(--text);
-  font-weight: 500;
-}
-
-.hidden {
-  display: none;
-}
-
-.portraitBtn {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: transparent;
-  cursor: pointer;
-  overflow: hidden;
-  height: 100%;
-  width: 100%;
-  position: relative;
-  z-index: 2;
-}
-
-.portraitBtn:hover {
-  border-color: var(--accent);
-  box-shadow: 0 4px 12px rgba(125, 211, 252, 0.1);
-}
-
-.coverContainer {
-  flex: 1;
-  min-height: 160px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.coverContainer.hasCover {
-  background: transparent;
-}
-
-.coverContainer.noCover::before {
-  content: "📖";
-  font-size: 6em;
-}
-
-.coverImage {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.bookTitle {
-  padding: 8px;
-  color: var(--text);
-  font-size: 0.85rem;
-  font-weight: 500;
-  text-align: center;
-  line-height: 1.3;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  background: var(--bg);
-}
-
-.deleteBtn {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  padding: 4px 8px;
-  background: var(--text);
-  border: 1px solid var(--border);
-  color: var(--bg);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1rem;
-  z-index: 3;
-}
-
-.deleteBtn:hover {
-  background: rgba(255, 0, 0, 0.3);
-  border-color: #ff4444;
-  color: #ffaa88;
-}
-
-.library .meta {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.tocList {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 6px;
-  flex: 1;
-  overflow-y: auto;
-}
-
-.tocList .meta {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.tocItem {
-  width: 100%;
-  text-align: start;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 8px;
-  padding: 8px 10px;
-  cursor: pointer;
-}
-
-.tocItem:hover {
-  border-color: var(--text);
-}
-
-.tocItem.active {
-  background: rgba(125, 211, 252, 0.1);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.library .row {
-  display: flex;
-  gap: 8px;
-}
-
-.viewer {
-  background: var(--viewer-bg);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
-  overflow: hidden;
-}
-
-.controls {
-  display: flex;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.positions {
-  display: grid;
-  gap: 4px;
-  color: var(--muted);
-  font-size: 0.95rem;
-}
-
-@media (max-width: 960px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-
-  .panel {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .viewer {
-    height: 70vh;
-  }
-}
-
-/* Toast notification */
 .toast {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  max-width: 60vw;
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  box-shadow: 0 10px 24px rgba(0,0,0,0.35);
-  opacity: 0;
-  transform: translateY(8px);
+  left: 50%;
+  bottom: calc(var(--footer-height) + var(--gap));
+  transform: translateX(-50%);
+  max-width: calc(100vw - 2 * var(--gap));
+  padding: 12px var(--gap);
+  border: var(--line) solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  visibility: hidden;
   pointer-events: none;
   z-index: 1000;
 }
 
 .toast.visible {
-  opacity: 1;
-  transform: translateY(0);
+  visibility: visible;
 }
 
-/* Inline progress bar */
 .progress {
   display: none;
-  padding: 10px 16px;
+  position: fixed;
+  inset: 0 0 auto;
+  padding: 12px var(--gap);
+  border-bottom: var(--line) solid var(--ink);
+  background: var(--paper);
+  z-index: 1000;
 }
 
 .progress.visible {
@@ -767,73 +563,44 @@ button.ghost {
 }
 
 .progress .bar {
-  height: 6px;
-  background: var(--border);
-  border-radius: 8px;
-  overflow: hidden;
+  height: 8px;
+  border: 1px solid var(--ink);
 }
 
 .progress .fill {
   height: 100%;
   width: 0%;
-  background: linear-gradient(120deg, var(--accent), var(--accent-strong));
+  background: var(--ink);
+}
+
+/* Unknown length: a still, striped bar rather than a moving one. */
+.progress.indeterminate .fill {
+  width: 100% !important;
+  background: repeating-linear-gradient(90deg, var(--ink) 0 8px, transparent 8px 16px);
 }
 
 .progress .label {
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 0.92rem;
+  margin-top: 8px;
 }
 
-.progress.indeterminate .fill {
-  width: 30%;
-  animation: slide 1.1s ease-in-out infinite;
-}
+/* --- Install dialog ---------------------------------------------------------- */
 
-@keyframes slide {
-  0% { transform: translateX(-120%); }
-  50% { transform: translateX(0%); }
-  100% { transform: translateX(120%); }
-}
-
-.fontSizeControl {
-  display: flex;
-  gap: 12px;
-  margin-top: 20px;
-  justify-content: center;
-  align-items: center;
-}
-
-.fontSizeBtn {
-  padding: 8px 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.95rem;
-  font-weight: 500;
-}
-
-.fontSizeBtn:hover {
-  background: var(--surface-hover);
-}
-
-.fontSizeBtn:active {
-  transform: scale(0.98);
-}
-
-/* Install Modal */
 .installModal {
   position: fixed;
   inset: 0;
-  background: transparent;
   display: none;
   align-items: center;
   justify-content: center;
-  border: none;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: var(--gap);
+  border: 0;
+  background: transparent;
+  color: var(--ink);
   z-index: 1000;
-  animation: fadeIn 0.2s ease-out;
 }
 
 .installModal::backdrop {
@@ -845,323 +612,37 @@ button.ghost {
 }
 
 .installModalContent {
-  box-shadow: 0 20px 25px rgba(0, 0, 0, 0.3);
-  background: #1e293b;
-  border-radius: 12px;
-  padding: 24px;
-  max-width: 400px;
-  width: 90%;
-  box-shadow: 0 20px 25px rgba(0, 0, 0, 0.3);
   position: relative;
+  width: 100%;
+  max-width: 400px;
+  padding: 24px var(--gap) var(--gap);
+  border: var(--line) solid var(--ink);
+  background: var(--paper);
 }
 
 .installModalClose {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  background: transparent;
-  border: none;
-  color: #94a3b8;
-  font-size: 24px;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-}
-
-.installModalClose:hover {
-  background: rgba(125, 211, 252, 0.1);
-  color: #7dd3fc;
-}
-
-.installModalBody {
-  margin-top: 8px;
+  top: calc(-1 * var(--line));
+  right: calc(-1 * var(--line));
+  width: 48px;
+  height: 48px;
+  min-height: 0;
+  padding: 0;
+  font-size: 20px;
 }
 
 .installModalBody h2 {
-  margin: 0 0 12px 0;
+  margin: 0 0 12px;
   font-size: 20px;
-  color: #f1f5f9;
 }
 
 .installModalBody p {
-  margin: 0 0 24px 0;
-  color: #cbd5e1;
-  line-height: 1.5;
+  margin: 0 0 24px;
+  line-height: 1.4;
 }
 
 .installModalButtons {
   display: flex;
-  gap: 12px;
   flex-direction: column-reverse;
-}
-
-.installButton {
-  padding: 10px 16px;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.installButton.primary {
-  background: var(--accent);
-  color: var(--text);
-}
-
-.installButton.primary:hover {
-  background: var(--accent-strong);
-}
-
-.installButton.secondary {
-  background: transparent;
-  color: var(--accent);
-  border: 1px solid var(--accent);
-}
-
-.installButton.secondary:hover {
-  background: rgba(125, 211, 252, 0.1);
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-.zoneGridContainer {
-  margin: 20px auto;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.02);
-  aspect-ratio: 1;
-  max-width: var(--max-width-setting-box);
-}
-
-.zoneGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-  margin-bottom: 16px;
-  aspect-ratio: 1;
-}
-
-.zoneCell {
-  aspect-ratio: 1;
-  border: 2px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg);
-  color: var(--text);
-  cursor: pointer;
-  font-size: 20px;
-  font-weight: bold;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.zoneCell:hover {
-  border-color: var(--accent);
-  background: rgba(125, 211, 252, 0.1);
-  transform: scale(0.98);
-}
-
-.zoneCell.active {
-  border-color: var(--accent-strong);
-  background: var(--accent);
-  color: var(--bg);
-  box-shadow: 0 0 8px rgba(34, 211, 238, 0.4);
-}
-
-.zoneInfo {
-  padding: 12px;
-  border-top: 1px solid var(--border);
-  text-align: center;
-}
-
-#zoneActionLabel {
-  margin: 0 0 10px 0;
-  font-size: 0.9rem;
-  color: var(--muted);
-  font-weight: 500;
-}
-
-.zoneActionButtons {
-  display: flex;
   gap: 8px;
-  justify-content: center;
-}
-
-.actionButton {
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg);
-  color: var(--text);
-  cursor: pointer;
-  font-size: 0.85rem;
-  flex: 1;
-  max-width: 120px;
-}
-
-.actionButton:hover {
-  border-color: var(--accent);
-  background: rgba(125, 211, 252, 0.1);
-}
-
-.actionButton.selected {
-  border-color: var(--accent-strong);
-  background: var(--accent-strong);
-  color: var(--bg);
-  font-weight: 600;
-}
-
-.settingsContent h3 {
-  margin: 20px 0 12px 0;
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.settingsContent h3:first-child {
-  margin-top: 0;
-}
-
-.viewerWidthControls {
-  display: grid;
-  gap: 8px;
-  max-width: 320px;
-  margin-bottom: 16px;
-}
-
-.aspectControlGroup {
-  display: grid;
-  gap: 8px;
-  margin: 0 auto 16px;
-  max-width: var(--max-width-setting-box);
-}
-
-.viewerWidthLabel {
-  font-size: 0.9rem;
-  color: var(--muted);
-  font-weight: 500;
-}
-
-.viewerWidthModeSelect,
-.viewerWidthValueInput {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--text);
-  padding: 8px 10px;
-  font-size: 0.95rem;
-}
-
-.viewerWidthModeSelect:focus,
-.viewerWidthValueInput:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.viewerWidthValueRow {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-}
-
-.viewerWidthValueRow .viewerWidthLabel {
-  grid-column: 1 / -1;
-}
-
-.viewerWidthUnit {
-  color: var(--muted);
-  font-size: 0.9rem;
-  font-weight: 600;
-  min-width: 2ch;
-  text-align: end;
-}
-
-.aspectButtonGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.aspectButtonGridDirection {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.aspectButton {
-  display: grid;
-  gap: 8px;
-  justify-items: center;
-  padding: 12px 10px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg);
-  color: var(--text);
-  cursor: pointer;
-  align-content: center;
-  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
-}
-
-.aspectButtonGrid:not(.aspectButtonGridDirection) .aspectButton {
-  min-height: 148px;
-}
-
-.aspectButtonGridDirection .aspectButton {
-  min-height: 122px;
-}
-
-.aspectButton:hover {
-  transform: translateY(-1px);
-  border-color: var(--accent);
-}
-
-.aspectButton:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.aspectButton:disabled:hover {
-  border-color: var(--border);
-}
-
-.aspectButton[aria-pressed="true"] {
-  border-color: var(--accent-strong);
-  background: rgba(125, 211, 252, 0.12);
-  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.25) inset;
-}
-
-.aspectButtonIcon {
-  display: block;
-  width: 58px;
-  height: 48px;
-  color: currentColor;
-  flex: none;
-}
-
-.aspectButtonIconDirection {
-  width: 60px;
-  height: 52px;
-}
-
-.aspectButtonIcon rect {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 3;
-  vector-effect: non-scaling-stroke;
-  stroke-linejoin: round;
-}
-
-.aspectButtonText {
-  font-size: 0.85rem;
-  font-weight: 600;
 }

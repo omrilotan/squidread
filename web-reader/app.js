@@ -126,7 +126,6 @@ let readerAspectDirection = 'device';
 
 // Zone action mapping: row/col -> action ('prev', 'next', or 'menu')
 // Zones are configured for left-to-right books; the grid is mirrored for RTL (Right to Left) books
-let selectedZoneForConfig = null;
 function getDefaultZoneMap() {
   return {
     '0,0': 'prev', '0,1': 'menu', '0,2': 'next',
@@ -281,6 +280,9 @@ function wireReaderAspectControls() {
   loadReaderAspectSettings();
   applyReaderAspectRatio();
   wireEvents();
+  const savedFontSize = parseFloat(localStorage.getItem('squidreadFontSize'));
+  if (savedFontSize > 0) currentFontSize = savedFontSize;
+  applyFontSize();
   await renderLibrary();
   
   // Load the last opened book if available
@@ -511,74 +513,83 @@ function wireEvents() {
 
   // Wire up zone grid controls
   wireZoneGridEvents();
+  wireThemeControls();
   wireReaderAspectControls();
 }
 
+const ZONE_ACTIONS = ['prev', 'menu', 'next'];
+const ZONE_LABELS = { prev: '‹ Prev', menu: 'Menu', next: 'Next ›' };
+
+// Same as the app: each zone shows its action, and tapping it moves to the next one.
 function wireZoneGridEvents() {
   const zoneCells = document.querySelectorAll('.zoneCell');
-  const actionButtons = document.querySelectorAll('.actionButton');
-  const zoneActionLabel = document.getElementById('zoneActionLabel');
+  if (!zoneCells.length) return;
 
-  if (!zoneCells.length || !actionButtons.length) return;
-
-  function updateZoneDisplay() {
-    // Batch DOM updates to reduce reflows
-    zoneCells.forEach((cell) => {
-      const zone = parseInt(cell.dataset.zone, 10);
-      cell.classList.toggle('active', zone === selectedZoneForConfig);
-    });
-
-    if (selectedZoneForConfig !== null) {
-      const row = Math.floor(selectedZoneForConfig / 3);
-      const col = selectedZoneForConfig % 3;
-      let action = getZoneAction(row, col);
-      
-      // Flip action for display if RTL to show physically correct direction
-      if (isRTL && (action === 'next' || action === 'prev')) {
-        action = action === 'next' ? 'prev' : 'next';
-      }
-      
-      actionButtons.forEach((btn) => {
-        btn.classList.toggle('selected', btn.dataset.action === action);
-      });
-    } else {
-      actionButtons.forEach((btn) => {
-        btn.classList.remove('selected');
-      });
-    }
-  }
+  const keyFor = (cell) => {
+    const zone = parseInt(cell.dataset.zone, 10);
+    return `${Math.floor(zone / 3)},${zone % 3}`;
+  };
+  const updateCell = (cell) => {
+    cell.textContent = ZONE_LABELS[zoneActionMap[keyFor(cell)]] || ZONE_LABELS.menu;
+  };
 
   zoneCells.forEach((cell) => {
+    updateCell(cell);
     cell.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const zone = parseInt(cell.dataset.zone, 10);
-      selectedZoneForConfig = zone;
-      zoneActionLabel.textContent = `Zone ${zone + 1} - Select an action`;
-      updateZoneDisplay();
-    });
-  });
-
-  actionButtons.forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (selectedZoneForConfig === null) {
-        showToast('Select a zone first');
-        return;
-      }
-      const row = Math.floor(selectedZoneForConfig / 3);
-      const col = selectedZoneForConfig % 3;
-      const action = btn.dataset.action;
-      const key = `${row},${col}`;
-      zoneActionMap[key] = action;
+      const key = keyFor(cell);
+      const current = ZONE_ACTIONS.indexOf(zoneActionMap[key]);
+      zoneActionMap[key] = ZONE_ACTIONS[(current + 1) % ZONE_ACTIONS.length];
       saveZoneMapToStorage();
-      updateZoneDisplay();
-      showToast(`Zone ${selectedZoneForConfig + 1} set to ${action}`);
+      updateCell(cell);
     });
   });
+}
 
-  updateZoneDisplay();
+// --- Theme: System follows the device; Light and Dark override it. ---
+
+const THEME_MODES = ['system', 'light', 'dark'];
+
+function getThemeMode() {
+  const stored = localStorage.getItem('squidreadTheme');
+  return THEME_MODES.includes(stored) ? stored : 'system';
+}
+
+function applyThemeMode(mode) {
+  if (mode === 'system') {
+    delete document.documentElement.dataset.theme;
+  } else {
+    document.documentElement.dataset.theme = mode;
+  }
+  document.querySelectorAll('[data-theme-mode]').forEach((button) => {
+    button.setAttribute('aria-pressed', button.dataset.themeMode === mode ? 'true' : 'false');
+  });
+  applyBookTheme();
+}
+
+/** The book's pages take the theme's two colours too. */
+function applyBookTheme() {
+  if (!rendition) return;
+  const styles = getComputedStyle(document.documentElement);
+  rendition.themes.override('color', styles.getPropertyValue('--ink').trim(), true);
+  rendition.themes.override('background', styles.getPropertyValue('--paper').trim(), true);
+}
+
+function wireThemeControls() {
+  document.querySelectorAll('[data-theme-mode]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const mode = button.dataset.themeMode;
+      if (mode === 'system') {
+        localStorage.removeItem('squidreadTheme');
+      } else {
+        localStorage.setItem('squidreadTheme', mode);
+      }
+      applyThemeMode(mode);
+    });
+  });
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applyBookTheme());
+  applyThemeMode(getThemeMode());
 }
 
 function isEditableTarget(target) {
@@ -742,11 +753,6 @@ async function renderLibrary() {
     li.className = 'libraryItem';
 
     const hasCoverData = record.coverDataUrl && record.coverDataUrl.startsWith('data:');
-    if (hasCoverData) {
-      li.style.backgroundImage = `url(${record.coverDataUrl})`;
-      li.style.backgroundSize = 'cover';
-      li.style.backgroundPosition = 'center';
-    }
 
     // Create portrait button with cover image
     const portraitBtn = document.createElement('button');
@@ -760,8 +766,12 @@ async function renderLibrary() {
     coverContainer.className = 'coverContainer';
 
     if (hasCoverData) {
-      // Cover exists, no need to show placeholder
       coverContainer.className = 'coverContainer hasCover';
+      const coverImage = document.createElement('img');
+      coverImage.className = 'coverImage';
+      coverImage.src = record.coverDataUrl;
+      coverImage.alt = '';
+      coverContainer.appendChild(coverImage);
     } else {
       if (record.coverDataUrl && record.coverDataUrl.startsWith('blob:')) {
         record.coverDataUrl = null;
@@ -813,7 +823,7 @@ function renderToc(tocItems = []) {
       btn.dataset.href = item.href || '';
       if (item.cfi) btn.dataset.cfi = item.cfi;
       btn.textContent = item.label || item.title || 'Untitled';
-      btn.style.paddingLeft = `${10 + level * 12}px`;
+      btn.style.paddingInlineStart = `${16 + level * 16}px`;
       if (!item.href) {
         btn.disabled = true;
       }
@@ -993,7 +1003,7 @@ async function loadBook(id) {
 
   // Update menu title with book title
   if (menuTitleEl) {
-    menuTitleEl.textContent = record.title || record.name || 'Squid Reader';
+    menuTitleEl.textContent = record.title || record.name || 'Squidread';
   }
 
   try {
@@ -1054,8 +1064,9 @@ async function loadBook(id) {
     
     await rendition.display(record.lastLocation || undefined);
     
-    // Apply current font size setting
+    // Apply current font size setting and theme colours
     applyFontSize();
+    applyBookTheme();
     
     // Wait a bit for the iframe to be created
     await wait(50);
@@ -1133,6 +1144,8 @@ function resetFontSize() {
 }
 
 function applyFontSize() {
+  const fontSizeValueEl = document.getElementById('fontSizeValue');
+  if (fontSizeValueEl) fontSizeValueEl.textContent = `${Math.round(currentFontSize * 100)}%`;
   if (!rendition) return;
   
   // Apply font size to the book's body element
@@ -1185,7 +1198,7 @@ function clearViewer() {
   chapterInfoEl.textContent = '-';
   if (chapterNumberEl) chapterNumberEl.textContent = '-';
   if (menuTitleEl) {
-    menuTitleEl.textContent = 'Squid Reader';
+    menuTitleEl.textContent = 'Squidread';
   }
   renderToc([]);
 }

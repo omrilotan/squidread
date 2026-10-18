@@ -3,18 +3,23 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-  <meta name="description" content="A modern, offline-capable EPUB reader" />
-  <meta name="theme-color" content="#7dd3fc" />
+  <meta name="description" content="A fast, distraction-free EPUB reader for e-ink" />
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Squidread" />
   <link rel="icon" href="icon-32.png" type="image/png" sizes="32x32" />
   <link rel="apple-touch-icon" href="icon-192.png" />
   <link rel="manifest" href="manifest.json" />
   <title>Squidread - EPUB reader</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    // Applied before the first paint, so a chosen theme never flashes the other one.
+    try {
+      const theme = localStorage.getItem('squidreadTheme');
+      if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+    } catch (error) {}
+  </script>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -45,26 +50,23 @@
   <main class="layout">
     <aside class="panel hidden" id="panel">
       <div class="panelHeader">
-        <img src="icon-32.png" alt="Squidread" class="panelIcon" width="32" height="32" />
+        <img src="logo.png" alt="" class="panelIcon" width="40" height="40" />
         <h2 id="menuTitle">Squidread</h2>
-        <button id="closePanel" class="ghost" title="Close menu">✕</button>
+        <button id="closePanel" class="closeButton" title="Close menu" aria-label="Close menu">✕</button>
       </div>
-      
+
       <nav class="panelNav">
-        <button id="navStyles" class="navBtn active">🔤</button>
-        <button id="navContents" class="navBtn">📄</button>
-        <button id="navLibrary" class="navBtn">📚</button>
-        <button id="navSettings" class="navBtn">⚙️</button>
+        <button id="navStyles" class="navBtn active">Aa</button>
+        <button id="navContents" class="navBtn">Contents</button>
+        <button id="navLibrary" class="navBtn">Library</button>
+        <button id="navSettings" class="navBtn">Settings</button>
       </nav>
 
       <div class="panelContent">
         <section id="librarySection" class="panelSection">
           <ul id="library" class="library">
             <li class="libraryAddItem">
-              <button id="addEpubBtn" class="addEpubButton">
-                <span class="addEpubPlus">+</span>
-                <span class="addEpubText">Add EPUB</span>
-              </button>
+              <button id="addEpubBtn" class="addEpubButton">+ Add EPUB</button>
               <input type="file" id="filePicker" accept="application/epub+zip,.epub" class="hidden" />
             </li>
           </ul>
@@ -77,114 +79,61 @@
         </section>
 
         <section id="stylesSection" class="panelSection active">
-          <div class="stylesTop"></div>
-          <div class="stylesMiddle">
-            <div class="stylesSide stylesSideLeft"></div>
-            <div class="stylesCenter"></div>
-            <div class="stylesSide stylesSideRight"></div>
-          </div>
-          <div class="stylesBottom">
-            <div class="fontSizeControl">
-              <button id="fontSizeDecrease" class="fontSizeBtn" title="Decrease font size">−</button>
-              <button id="fontSizeReset" class="fontSizeBtn" title="Reset font size">Reset</button>
-              <button id="fontSizeIncrease" class="fontSizeBtn" title="Increase font size">+</button>
+          <!-- A framed window onto the page, so font size changes show as they're made. -->
+          <div class="stylesPreview" aria-hidden="true"></div>
+          <div class="stylesControls">
+            <h3>Font size</h3>
+            <div class="segmented fontSizeControl">
+              <button id="fontSizeDecrease" title="Decrease font size" aria-label="Decrease font size">−</button>
+              <button id="fontSizeReset" class="wide" title="Reset font size">Reset</button>
+              <button id="fontSizeIncrease" title="Increase font size" aria-label="Increase font size">+</button>
             </div>
+            <p id="fontSizeValue" class="fontSizeValue">100%</p>
           </div>
         </section>
 
         <section id="settingsSection" class="panelSection">
           <div class="settingsContent">
-            <p>Squidread EPUB reader</p>
-            <p>Version α (alpha): Work in progress</p>
-
-            <h3>Reader Aspect Ratio</h3>
-            <div class="aspectControlGroup">
-              <div class="viewerWidthLabel">Preset</div>
-              <div class="aspectButtonGrid" id="viewerAspectPreset" role="radiogroup" aria-label="Reader aspect ratio preset">
-                <button type="button" class="aspectButton" data-aspect-preset="fullscreen" aria-pressed="false">
-                  <svg class="aspectButtonIcon aspectButtonIconPreset" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-                    <rect x="8" y="8" width="48" height="48" rx="10" ry="10" />
-                    <rect x="18" y="18" width="28" height="28" rx="6" ry="6" />
-                  </svg>
-                  <span class="aspectButtonText">Full-screen</span>
-                </button>
-                <button type="button" class="aspectButton" data-aspect-preset="16:9" aria-pressed="false">
-                  <svg class="aspectButtonIcon aspectButtonIconPreset" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-                    <rect x="8" y="8" width="48" height="48" rx="10" ry="10" />
-                    <rect x="22" y="16" width="20" height="32" rx="5" ry="5" />
-                  </svg>
-                  <span class="aspectButtonText">16:9</span>
-                </button>
-                <button type="button" class="aspectButton" data-aspect-preset="4:3" aria-pressed="false">
-                  <svg class="aspectButtonIcon aspectButtonIconPreset" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-                    <rect x="8" y="8" width="48" height="48" rx="10" ry="10" />
-                    <rect x="20" y="14" width="24" height="36" rx="5" ry="5" />
-                  </svg>
-                  <span class="aspectButtonText">4:3</span>
-                </button>
-                <button type="button" class="aspectButton" data-aspect-preset="1:1" aria-pressed="false">
-                  <svg class="aspectButtonIcon aspectButtonIconPreset" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-                    <rect x="8" y="8" width="48" height="48" rx="10" ry="10" />
-                    <rect x="18" y="18" width="28" height="28" rx="5" ry="5" />
-                  </svg>
-                  <span class="aspectButtonText">1:1</span>
-                </button>
-              </div>
+            <h3>Theme</h3>
+            <div class="segmented" role="radiogroup" aria-label="Theme">
+              <button type="button" data-theme-mode="system" aria-pressed="false">System</button>
+              <button type="button" data-theme-mode="light" aria-pressed="false">Light</button>
+              <button type="button" data-theme-mode="dark" aria-pressed="false">Dark</button>
             </div>
 
-            <div class="aspectControlGroup">
-              <div class="viewerWidthLabel">Direction</div>
-              <div class="aspectButtonGrid aspectButtonGridDirection" id="viewerAspectDirection" role="radiogroup" aria-label="Reader aspect ratio direction">
-                <button type="button" class="aspectButton" data-aspect-direction="device" aria-pressed="false">
-                  <svg class="aspectButtonIcon aspectButtonIconDirection" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-                    <rect x="8" y="8" width="48" height="48" rx="10" ry="10" />
-                    <rect x="21" y="20" width="22" height="22" rx="5" ry="5" />
-                  </svg>
-                  <span class="aspectButtonText">Device</span>
-                </button>
-                <button type="button" class="aspectButton" data-aspect-direction="portrait" aria-pressed="false">
-                  <svg class="aspectButtonIcon aspectButtonIconDirection" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-                    <rect x="8" y="8" width="48" height="48" rx="10" ry="10" />
-                    <rect x="27" y="18" width="10" height="26" rx="4" ry="4" />
-                  </svg>
-                  <span class="aspectButtonText">Portrait</span>
-                </button>
-                <button type="button" class="aspectButton" data-aspect-direction="landscape" aria-pressed="false">
-                  <svg class="aspectButtonIcon aspectButtonIconDirection" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-                    <rect x="8" y="8" width="48" height="48" rx="10" ry="10" />
-                    <rect x="18" y="27" width="26" height="10" rx="4" ry="4" />
-                  </svg>
-                  <span class="aspectButtonText">Landscape</span>
-                </button>
-              </div>
+            <h3>Tap zone actions</h3>
+            <div class="zoneGrid">
+              <button class="zoneCell" data-zone="0" aria-label="Top left"></button>
+              <button class="zoneCell" data-zone="1" aria-label="Top centre"></button>
+              <button class="zoneCell" data-zone="2" aria-label="Top right"></button>
+              <button class="zoneCell" data-zone="3" aria-label="Middle left"></button>
+              <button class="zoneCell" data-zone="4" aria-label="Middle centre"></button>
+              <button class="zoneCell" data-zone="5" aria-label="Middle right"></button>
+              <button class="zoneCell" data-zone="6" aria-label="Bottom left"></button>
+              <button class="zoneCell" data-zone="7" aria-label="Bottom centre"></button>
+              <button class="zoneCell" data-zone="8" aria-label="Bottom right"></button>
             </div>
-            
-            <h3>Click Zone Actions</h3>
-            <div id="zoneGridContainer" class="zoneGridContainer">
-              <div class="zoneGrid">
-                <button class="zoneCell" data-zone="0" title="Top-Left">↖️</button>
-                <button class="zoneCell" data-zone="1" title="Top-Center">⬆️</button>
-                <button class="zoneCell" data-zone="2" title="Top-Right">↗️</button>
-                <button class="zoneCell" data-zone="3" title="Middle-Left">⬅️</button>
-                <button class="zoneCell" data-zone="4" title="Middle-Center">⊙</button>
-                <button class="zoneCell" data-zone="5" title="Middle-Right">➡️</button>
-                <button class="zoneCell" data-zone="6" title="Bottom-Left">↙️</button>
-                <button class="zoneCell" data-zone="7" title="Bottom-Center">⬇️</button>
-                <button class="zoneCell" data-zone="8" title="Bottom-Right">↘️</button>
-              </div>
-              <div class="zoneInfo">
-                <p id="zoneActionLabel">Select a zone to configure</p>
-                <div class="zoneActionButtons">
-                  <button class="actionButton" data-action="prev">← Previous</button>
-                  <button class="actionButton" data-action="menu">☰ Menu</button>
-                  <button class="actionButton" data-action="next">Next →</button>
-                </div>
-              </div>
-              <p style="font-size: 0.85rem; color: var(--muted); margin: 8px 0 0 0;">📝 For right-to-left (RTL) books, the grid is mirrored.</p>
+            <p class="hint">Tap a zone to cycle its action. For right-to-left books, the grid is mirrored.</p>
+
+            <h3>Reader aspect ratio</h3>
+            <div class="segmented" id="viewerAspectPreset" role="radiogroup" aria-label="Reader aspect ratio">
+              <button type="button" data-aspect-preset="fullscreen" aria-pressed="false">Full-screen</button>
+              <button type="button" data-aspect-preset="16:9" aria-pressed="false">16:9</button>
+              <button type="button" data-aspect-preset="4:3" aria-pressed="false">4:3</button>
+              <button type="button" data-aspect-preset="1:1" aria-pressed="false">1:1</button>
             </div>
-            
-            <p><a id="swRefreshLink" href="#">🔄 Refresh service worker</a></p>
-            <p><a href="https://github.com/omrilotan/squidread" target="_blank" rel="noopener noreferrer">Source @ GitHub</a></p>
+            <h3>Direction</h3>
+            <div class="segmented" id="viewerAspectDirection" role="radiogroup" aria-label="Reader direction">
+              <button type="button" data-aspect-direction="device" aria-pressed="false">Device</button>
+              <button type="button" data-aspect-direction="portrait" aria-pressed="false">Portrait</button>
+              <button type="button" data-aspect-direction="landscape" aria-pressed="false">Landscape</button>
+            </div>
+
+            <h3>Squidread</h3>
+            <p>Web reader, alpha</p>
+            <a class="linkButton" href="https://omrilotan.com/squidread/" target="_blank" rel="noopener noreferrer">Website</a>
+            <a class="linkButton" href="https://github.com/omrilotan/squidread" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
+            <a class="linkButton" id="swRefreshLink" href="#">Refresh service worker</a>
           </div>
         </section>
       </div>
@@ -193,11 +142,7 @@
     <section class="reader">
       <div id="viewer" class="viewer"></div>
       <div id="viewerEmptyState" class="viewerEmptyState" aria-hidden="true">
-        <div class="viewerEmptyGraphic" aria-hidden="true">
-          <div class="viewerEmptyCircle viewerEmptyCircleOuter"></div>
-          <div class="viewerEmptyCircle viewerEmptyCircleInner"></div>
-          <div class="viewerEmptyBook">📖</div>
-        </div>
+        <img class="viewerEmptyLogo" src="logo.png" alt="" width="120" height="120" />
         <div class="viewerEmptyText">No book selected</div>
       </div>
       <footer class="readerFooter">

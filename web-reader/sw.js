@@ -1,10 +1,11 @@
-const CACHE_NAME = 'squidread-shell-v4';
+const CACHE_NAME = 'squidread-shell-v5';
 const ASSETS = [
   '/',
   '/index.html',
   '/styles.css',
   '/app.js',
   '/icon-32.png',
+  '/logo.png',
   'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',
   'https://cdn.jsdelivr.net/npm/epubjs@0.3/dist/epub.min.js',
 ];
