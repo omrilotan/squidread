@@ -95,7 +95,12 @@ class MainActivity : AppCompatActivity() {
 
 	private lateinit var readerArea: ReaderFrame
 	private lateinit var navigatorContainer: View
-	private lateinit var readerMessage: TextView
+	private lateinit var readerMessage: View
+	private lateinit var readerMessageTitle: TextView
+	private lateinit var readerIntro: View
+	private lateinit var readerIntroLogo: View
+	private lateinit var readerIntroZones: View
+	private lateinit var readerSelect: View
 	private lateinit var loadingView: View
 	private lateinit var loadingCover: ImageView
 	private lateinit var loadingTitle: TextView
@@ -103,7 +108,6 @@ class MainActivity : AppCompatActivity() {
 	private lateinit var chapterInfoView: TextView
 	private lateinit var progressView: TextView
 	private lateinit var menu: View
-	private lateinit var welcome: View
 	private lateinit var systemBars: WindowInsetsControllerCompat
 	private lateinit var barScrims: List<View>
 	private lateinit var menuTitle: TextView
@@ -112,6 +116,7 @@ class MainActivity : AppCompatActivity() {
 	private lateinit var fontName: TextView
 	private lateinit var fontsMessage: TextView
 	private lateinit var fontsFolderButton: View
+	private lateinit var fontsHowToButton: View
 	private lateinit var tocList: RecyclerView
 	private lateinit var tocEmpty: TextView
 	private lateinit var libraryList: RecyclerView
@@ -229,7 +234,6 @@ class MainActivity : AppCompatActivity() {
 		onBackPressedDispatcher.addCallback(this) {
 			val nav = navigator
 			when {
-				welcome.isVisible -> closeWelcome()
 				menu.isVisible -> closeMenu()
 				nav != null && linkHistory.isNotEmpty() -> nav.go(linkHistory.removeAt(linkHistory.lastIndex), animated = false)
 				else -> moveTaskToBack(true)
@@ -244,12 +248,9 @@ class MainActivity : AppCompatActivity() {
 				// The book is gone; this task now works like the library task.
 				taskBookId = null
 			}
-			openMenu(Section.LIBRARY)
-			// First run: how to make Squidread the default reader. Anyone with books already
-			// found their way in, so it's skipped for them.
-			if (!prefs.welcomed) {
-				if (library.all().isEmpty()) welcome.isVisible = true else prefs.welcomed = true
-			}
+			showNoBook(true)
+			// With no books, the screen behind the menu says how to get started.
+			if (library.all().isNotEmpty()) openMenu(Section.LIBRARY)
 			// Shows the library once, with its covers.
 			window.decorView.holdDrawing(lifecycleScope, LIBRARY_WAIT_MS) { preloadCovers() }
 		}
@@ -429,7 +430,6 @@ class MainActivity : AppCompatActivity() {
 			val right = (bars.right - cutout.right).coerceAtLeast(0)
 			val bottom = (bars.bottom - cutout.bottom).coerceAtLeast(0)
 			menu.updatePadding(left = left, top = top, right = right, bottom = bottom)
-			welcome.updatePadding(left = left, top = top, right = right, bottom = bottom)
 			scrims[0].setSize(height = top)
 			scrims[1].setSize(height = bottom)
 			scrims[2].setSize(width = left)
@@ -451,6 +451,24 @@ class MainActivity : AppCompatActivity() {
 		readerArea = findViewById(R.id.reader_area)
 		navigatorContainer = findViewById(R.id.navigator_container)
 		readerMessage = findViewById(R.id.reader_message)
+		readerMessageTitle = findViewById(R.id.reader_message_title)
+		readerIntro = findViewById(R.id.reader_intro)
+		readerIntroLogo = findViewById(R.id.reader_intro_logo)
+		readerIntroZones = findViewById(R.id.reader_intro_zones)
+		readerSelect = findViewById(R.id.reader_select)
+		findViewById<View>(R.id.reader_message_content).setOnClickListener { openMenu(Section.LIBRARY) }
+		readerSelect.setOnClickListener { openMenu(Section.LIBRARY) }
+		findViewById<View>(R.id.reader_add).setOnClickListener { pickEpub() }
+		findViewById<View>(R.id.reader_example).setOnClickListener {
+			openExternal(Uri.parse(getString(R.string.gutenberg_example_url)))
+		}
+		findViewById<View>(R.id.reader_more).setOnClickListener {
+			openExternal(Uri.parse(getString(R.string.gutenberg_url)))
+		}
+		findViewById<TextView>(R.id.reader_intro_tip).setText(if (isBoox) R.string.default_tip_boox else R.string.default_tip_android)
+		findViewById<View>(R.id.reader_how_to).setOnClickListener {
+			openExternal(Uri.parse(getString(R.string.default_url)))
+		}
 		loadingView = findViewById(R.id.loading)
 		loadingCover = findViewById(R.id.loading_cover)
 		loadingTitle = findViewById(R.id.loading_title)
@@ -458,21 +476,13 @@ class MainActivity : AppCompatActivity() {
 		chapterInfoView = findViewById(R.id.chapter_info)
 		progressView = findViewById(R.id.progress)
 		menu = findViewById(R.id.menu)
-		welcome = findViewById(R.id.welcome)
-		findViewById<View>(R.id.welcome_start).apply {
-			isSelected = true
-			setOnClickListener { closeWelcome() }
-		}
-		findViewById<TextView>(R.id.welcome_tip).setText(if (isBoox) R.string.welcome_tip_boox else R.string.welcome_tip_android)
-		findViewById<View>(R.id.welcome_more).setOnClickListener {
-			openExternal(Uri.parse(getString(R.string.default_url)))
-		}
 		menuTitle = findViewById(R.id.menu_title)
 		fontSizeValue = findViewById(R.id.font_size_value)
 		fontPicker = findViewById(R.id.font_picker)
 		fontName = findViewById(R.id.font_name)
 		fontsMessage = findViewById(R.id.fonts_message)
 		fontsFolderButton = findViewById(R.id.fonts_folder)
+		fontsHowToButton = findViewById(R.id.fonts_how_to)
 		tocList = findViewById(R.id.toc_list)
 		tocEmpty = findViewById(R.id.toc_empty)
 		libraryList = findViewById(R.id.library_list)
@@ -501,6 +511,7 @@ class MainActivity : AppCompatActivity() {
 		findViewById<View>(R.id.font_previous).setOnClickListener { cycleFont(-1) }
 		findViewById<View>(R.id.font_next).setOnClickListener { cycleFont(1) }
 		fontName.setOnClickListener { chooseFont() }
+		fontsHowToButton.setOnClickListener { openExternal(Uri.parse(getString(R.string.fonts_url))) }
 		fontsFolderButton.setOnClickListener {
 			try {
 				pickFontsFolder.launch(fonts.initialFolder)
@@ -517,13 +528,7 @@ class MainActivity : AppCompatActivity() {
 			library = library,
 			covers = app.covers,
 			scope = lifecycleScope,
-			onAdd = {
-				try {
-					pickDocument.launch(EPUB_MIME_TYPES)
-				} catch (error: ActivityNotFoundException) {
-					toast(R.string.open_failed)
-				}
-			},
+			onAdd = ::pickEpub,
 			onOpen = { selected ->
 				if (selected.id == taskBookId) {
 					if (book == null && openJob?.isActive != true) openBook(selected) else closeMenu()
@@ -534,6 +539,7 @@ class MainActivity : AppCompatActivity() {
 				}
 			},
 			onDelete = { selected -> confirmDelete(selected) },
+			onLink = { url -> openExternal(Uri.parse(getString(url))) },
 			emptyHint = getString(if (isBoox) R.string.library_hint_boox else R.string.library_hint_android),
 		)
 		libraryList.layoutManager = GridLayoutManager(this, libraryColumns()).apply {
@@ -706,7 +712,7 @@ class MainActivity : AppCompatActivity() {
 			// This task's book is gone; it now works like the library task.
 			if (taskBookId == selected.id) taskBookId = null
 		}
-		showMessage(R.string.no_book)
+		showNoBook(true)
 		openMenu(Section.LIBRARY)
 	}
 
@@ -716,7 +722,7 @@ class MainActivity : AppCompatActivity() {
 	 */
 	private fun showLoading(selected: Book) {
 		closeMenu()
-		showMessage(null)
+		showNoBook(false)
 		loadingTitle.text = selected.title
 		val coverFile = library.coverFile(selected.id)
 		val cached = app.covers.cached(selected.id)
@@ -803,7 +809,7 @@ class MainActivity : AppCompatActivity() {
 				}
 				else -> {
 					toast(R.string.open_failed)
-					showMessage(R.string.no_book)
+					showNoBook(true)
 					openMenu(Section.LIBRARY)
 				}
 			}
@@ -1186,9 +1192,27 @@ class MainActivity : AppCompatActivity() {
 		if (text.toString() != value) text = value
 	}
 
-	private fun showMessage(message: Int?) {
-		readerMessage.isVisible = message != null
-		message?.let { readerMessage.setText(it) }
+	/**
+	 * The screen behind the menu while no book is open. An empty library gets what the screen is
+	 * for and where books come from; otherwise there's a way back to the library.
+	 */
+	private fun showNoBook(visible: Boolean) {
+		readerMessage.isVisible = visible
+		if (!visible) return
+		val empty = library.all().isEmpty()
+		readerMessageTitle.setTextIfChanged(getString(if (empty) R.string.reader_intro_title else R.string.no_book))
+		readerIntroLogo.isVisible = empty
+		readerIntro.isVisible = empty
+		readerIntroZones.isVisible = prefs.zones == ReaderPreferences.DEFAULT_ZONES
+		readerSelect.isVisible = !empty
+	}
+
+	private fun pickEpub() {
+		try {
+			pickDocument.launch(EPUB_MIME_TYPES)
+		} catch (error: ActivityNotFoundException) {
+			toast(R.string.open_failed)
+		}
 	}
 
 	// --- Menu ------------------------------------------------------------------
@@ -1200,11 +1224,6 @@ class MainActivity : AppCompatActivity() {
 		setSystemBarsVisible(true)
 	}
 
-	private fun closeWelcome() {
-		welcome.isVisible = false
-		prefs.welcomed = true
-	}
-
 	private fun closeMenu() {
 		pendingJump?.cancel()
 		pendingJump = null
@@ -1213,6 +1232,8 @@ class MainActivity : AppCompatActivity() {
 		barScrims.forEach { it.isVisible = false }
 		setSystemBarsVisible(false)
 		readerArea.requestFocus()
+		// Books may have come or gone while the menu was open.
+		if (readerMessage.isVisible) showNoBook(true)
 		// In the same frame that reveals the footer.
 		if (footerStale) {
 			footerStale = false
@@ -1336,6 +1357,7 @@ class MainActivity : AppCompatActivity() {
 		message?.let { fontsMessage.setTextIfChanged(it) }
 		// Also offered for an empty folder, in case the wrong one was chosen.
 		fontsFolderButton.isVisible = families.isEmpty()
+		fontsHowToButton.isVisible = access && families.isEmpty()
 	}
 
 	private fun cycleFont(step: Int) {

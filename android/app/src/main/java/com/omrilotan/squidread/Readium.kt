@@ -28,8 +28,14 @@ class Readium(context: Context, private val fonts: Fonts) {
 	 */
 	suspend fun open(file: File): Publication? {
 		val asset = assetRetriever.retrieve(file).getOrElse { error ->
-			Log.w(TAG, "Cannot read ${file.name}: ${error.message}")
-			return null
+			if (!dropDuplicateEntries(file)) {
+				Log.w(TAG, "Cannot read ${file.name}: ${error.message}")
+				return null
+			}
+			assetRetriever.retrieve(file).getOrElse { retryError ->
+				Log.w(TAG, "Cannot read ${file.name} without repeated entries: ${retryError.message}")
+				return null
+			}
 		}
 		val publication = guarded(onFailure = { asset.close() }) {
 			publicationOpener.open(

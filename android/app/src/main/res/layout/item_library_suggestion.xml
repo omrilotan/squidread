@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Next to the "Add EPUB" tile while the library is empty: where free books can be found. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent"
+  android:layout_height="wrap_content"
+  android:layout_margin="6dp"
+  android:background="@drawable/frame"
+  android:gravity="center"
+  android:orientation="vertical"
+  android:padding="8dp">
+
+  <TextView
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:text="@string/suggest_books_title"
+    android:textColor="@color/ink"
+    android:textSize="16sp"
+    android:textStyle="bold" />
+
+  <TextView
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:paddingTop="8dp"
+    android:paddingBottom="12dp"
+    android:text="@string/suggest_books_text"
+    android:textColor="@color/ink"
+    android:textSize="14sp" />
+
+  <TextView
+    android:id="@+id/suggest_example"
+    style="@style/Squidread.Button"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="@string/suggest_books_example" />
+
+  <TextView
+    android:id="@+id/suggest_more"
+    style="@style/Squidread.Button"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:text="@string/suggest_books_more" />
+</LinearLayout>

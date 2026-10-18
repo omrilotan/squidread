@@ -268,15 +268,20 @@ class Fonts(private val context: Context, private val prefs: ReaderPreferences) 
 			RegexOption.IGNORE_CASE,
 		)
 
+		/** A capital after a small letter, as in `NotoSerif`. */
+		val WORD_START = Regex("(?<=\\p{Ll})(?=\\p{Lu})")
+
 		fun face(fileName: String, uri: Uri, size: Long?): FontFace? {
 			val base = fileName.substringBeforeLast('.')
 			val match = STYLED_NAME.matchEntire(base)?.groupValues
 			val weight = match?.get(2).orEmpty().lowercase()
 			val italic = match?.get(3).orEmpty().isNotEmpty()
 			val styled = weight.isNotEmpty() || italic
-			// The name goes into CSS; keep it to characters that need no escaping.
+			// The name goes into CSS; keep it to characters that need no escaping. Names written
+			// together, like `NotoSerif`, are spaced as they're spoken: "Noto Serif".
 			val family = (if (styled) match!![1] else base)
 				.replace('_', ' ')
+				.replace(WORD_START, " ")
 				.filter { it.isLetterOrDigit() || it == ' ' || it == '-' }
 				.trim()
 				.ifEmpty { return null }

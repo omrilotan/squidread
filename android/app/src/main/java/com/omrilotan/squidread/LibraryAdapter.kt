@@ -2,9 +2,11 @@ package com.omrilotan.squidread
 
 import android.annotation.SuppressLint
 import android.graphics.Typeface
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
@@ -16,8 +18,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * "Add EPUB" tile followed by the books, most recently opened first. While there are no books,
- * [emptyHint] follows the tile, across the whole row.
+ * "Add EPUB" tile followed by the books, most recently opened first. While there are no books, a
+ * tile suggesting free books follows it, then [emptyHint] across the whole row.
  */
 class LibraryAdapter(
 	private val library: Library,
@@ -26,6 +28,8 @@ class LibraryAdapter(
 	private val onAdd: () -> Unit,
 	private val onOpen: (Book) -> Unit,
 	private val onDelete: (Book) -> Unit,
+	/** Opens one of the suggestion tile's links, given as a string resource. */
+	private val onLink: (Int) -> Unit,
 	private val emptyHint: CharSequence,
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 	private var books: List<Book> = emptyList()
@@ -50,12 +54,13 @@ class LibraryAdapter(
 		Unit
 	}
 
-	override fun getItemCount() = if (books.isEmpty()) 2 else books.size + 1
+	override fun getItemCount() = if (books.isEmpty()) 3 else books.size + 1
 
 	override fun getItemViewType(position: Int) = when {
 		position == 0 -> TYPE_ADD
-		books.isEmpty() -> TYPE_HINT
-		else -> TYPE_BOOK
+		books.isNotEmpty() -> TYPE_BOOK
+		position == 1 -> TYPE_SUGGESTION
+		else -> TYPE_HINT
 	}
 
 	/** Whether the item at [position] takes a whole row of the grid. */
@@ -67,6 +72,12 @@ class LibraryAdapter(
 			val hint = inflater.inflate(R.layout.item_library_hint, parent, false) as TextView
 			hint.text = emptyHint
 			return object : RecyclerView.ViewHolder(hint) {}
+		}
+		if (viewType == TYPE_SUGGESTION) {
+			val view = inflater.inflate(R.layout.item_library_suggestion, parent, false)
+			view.findViewById<View>(R.id.suggest_example).setOnClickListener { onLink(R.string.gutenberg_example_url) }
+			view.findViewById<View>(R.id.suggest_more).setOnClickListener { onLink(R.string.gutenberg_url) }
+			return object : RecyclerView.ViewHolder(view) {}
 		}
 		val view = inflater.inflate(R.layout.item_library, parent, false)
 		return if (viewType == TYPE_ADD) AddHolder(view) else BookHolder(view)
@@ -81,6 +92,8 @@ class LibraryAdapter(
 
 	private inner class AddHolder(view: View) : RecyclerView.ViewHolder(view) {
 		fun bind() {
+			// The label stays at the bottom when a taller tile beside it stretches the row.
+			itemView.findViewById<LinearLayout>(R.id.book).gravity = Gravity.BOTTOM
 			itemView.findViewById<TextView>(R.id.title).setText(R.string.add_epub)
 			itemView.findViewById<View>(R.id.delete).isVisible = false
 			itemView.findViewById<CoverView>(R.id.cover).setImageDrawable(null)
@@ -119,5 +132,6 @@ class LibraryAdapter(
 		const val TYPE_ADD = 0
 		const val TYPE_BOOK = 1
 		const val TYPE_HINT = 2
+		const val TYPE_SUGGESTION = 3
 	}
 }

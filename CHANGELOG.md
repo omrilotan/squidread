@@ -2,6 +2,12 @@
 
 Releases of the Android app. Each entry's notes are what goes into Google Play's "Release notes" (500 characters at most).
 
+## 1.0.0-rc-20261018 (versionCode 4)
+
+- A new first screen, in place of the hello: where you read, how to turn pages, and how to get your first book. With books but none open, a "Select a book" button opens the library.
+- Suggestions to get started: free books from Project Gutenberg in an empty library, and a font to add, with a how-to, in an empty fonts folder.
+- Bug fix: some EPUBs that list the same file twice failed to open. They now open.
+
 ## 1.0.0-rc-20261017 (versionCode 3)
 
 - A short hello on first launch, with a tip on making Squidread your default EPUB reader. An empty library shows the same tip.
