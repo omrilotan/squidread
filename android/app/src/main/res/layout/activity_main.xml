@@ -534,30 +534,36 @@
         </LinearLayout>
       </LinearLayout>
 
-      <FrameLayout
+      <!-- The note says why the list is empty, or, for a book without contents, what it lists instead. -->
+      <LinearLayout
         android:id="@+id/section_contents"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@color/paper"
+        android:orientation="vertical"
         android:visibility="gone">
-
-        <androidx.recyclerview.widget.RecyclerView
-          android:id="@+id/toc_list"
-          android:layout_width="match_parent"
-          android:layout_height="match_parent"
-          android:overScrollMode="never"
-          android:scrollbars="none" />
 
         <TextView
           android:id="@+id/toc_empty"
           android:layout_width="match_parent"
           android:layout_height="wrap_content"
           android:gravity="center"
-          android:padding="32dp"
+          android:paddingStart="32dp"
+          android:paddingTop="24dp"
+          android:paddingEnd="32dp"
+          android:paddingBottom="16dp"
           android:textColor="@color/ink"
           android:textSize="16sp"
           android:visibility="gone" />
-      </FrameLayout>
+
+        <androidx.recyclerview.widget.RecyclerView
+          android:id="@+id/toc_list"
+          android:layout_width="match_parent"
+          android:layout_height="0dp"
+          android:layout_weight="1"
+          android:overScrollMode="never"
+          android:scrollbars="none" />
+      </LinearLayout>
 
       <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/library_list"

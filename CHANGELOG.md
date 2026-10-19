@@ -2,6 +2,10 @@
 
 Releases of the Android app. Each entry's notes are what goes into Google Play's "Release notes" (500 characters at most).
 
+## 1.0.0-rc-20261019 (versionCode 5)
+
+- Books without a table of contents now list their sections in Contents, named after each section's heading, so you can jump between them.
+
 ## 1.0.0-rc-20261018 (versionCode 4)
 
 - A new first screen, in place of the hello: where you read, how to turn pages, and how to get your first book. With books but none open, a "Select a book" button opens the library.

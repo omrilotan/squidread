@@ -11,8 +11,8 @@ android {
 		minSdk = 24
 		targetSdk = 36
 		// Only ever increases; devices already have test builds up to 5 installed.
-		versionCode = 4
-		versionName = "1.0.0-rc-20261018"
+		versionCode = 5
+		versionName = "1.0.0-rc-20261019"
 	}
 
 	// Readium's page script and styles load into every chapter; stored uncompressed, they are

@@ -59,6 +59,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.readium.r2.navigator.HyperlinkNavigator
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
@@ -78,11 +79,13 @@ import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.indexOfFirstWithHref
 import org.readium.r2.shared.util.AbsoluteUrl
+import org.readium.r2.shared.util.use
 import java.util.Date
 import kotlin.math.roundToInt
 
 /** A book opened in the background, with its contents list built there too. */
-private class OpenedBook(val publication: Publication, val toc: List<TocEntry>)
+/** [sections] when the book has no table of contents and [toc] lists its files instead. */
+private class OpenedBook(val publication: Publication, val toc: List<TocEntry>, val sections: Boolean)
 
 @OptIn(ExperimentalReadiumApi::class)
 class MainActivity : AppCompatActivity() {
@@ -150,6 +153,8 @@ class MainActivity : AppCompatActivity() {
 
 	/** A Contents jump to another chapter: the menu stays up until the page is ready. */
 	private var pendingJump: Job? = null
+	private var sectionTitlesJob: Job? = null
+	private var showsSections = false
 
 	/** Where links in the book were followed from; Back returns there. */
 	private val linkHistory = ArrayDeque<Locator>()
@@ -655,7 +660,13 @@ class MainActivity : AppCompatActivity() {
 	 */
 	private fun startOpening(selected: Book): Deferred<OpenedBook?> = lifecycleScope.async(Dispatchers.IO + NonCancellable) {
 		app.readium.open(library.file(selected.id))?.let { opened ->
-			OpenedBook(opened, buildToc(opened.tableOfContents))
+			val toc = buildToc(opened.tableOfContents)
+			if (toc.isNotEmpty()) {
+				OpenedBook(opened, toc, sections = false)
+			} else {
+				val sections = buildSections(opened.readingOrder) { number -> getString(R.string.toc_section, number) }
+				OpenedBook(opened, sections, sections = true)
+			}
 		}
 	}
 
@@ -822,6 +833,8 @@ class MainActivity : AppCompatActivity() {
 		publication = opened.publication
 		menuTitle.text = selected.title
 		tocAdapter.submit(opened.toc)
+		showsSections = opened.sections
+		if (opened.sections) findSectionTitles(opened)
 
 		val initialLocator = selected.locator?.let { json ->
 			runCatching { Locator.fromJSON(JSONObject(json)) }.getOrNull()
@@ -903,6 +916,9 @@ class MainActivity : AppCompatActivity() {
 		navigator = null
 		// The factory holds the publication; let it go with the navigator.
 		supportFragmentManager.fragmentFactory = FragmentFactory()
+		sectionTitlesJob?.cancel()
+		sectionTitlesJob = null
+		showsSections = false
 		publication?.close()
 		publication = null
 		book = null
@@ -1092,6 +1108,26 @@ class MainActivity : AppCompatActivity() {
 		pendingJump = lifecycleScope.launch {
 			delay(if (sameChapter) SAME_CHAPTER_JUMP_TIMEOUT_MS else JUMP_TIMEOUT_MS)
 			closeMenu()
+		}
+	}
+
+	/**
+	 * Names the sections of a book without a table of contents after the first heading in each,
+	 * in the background, so the book opens as fast as any other. Until then they are numbered.
+	 */
+	private fun findSectionTitles(opened: OpenedBook) {
+		sectionTitlesJob = lifecycleScope.launch {
+			val titles = withContext(Dispatchers.IO) {
+				opened.toc.map { entry ->
+					runCatching {
+						opened.publication.get(entry.link)?.use { it.read(0L until SECTION_HEADING_BYTES) }
+							?.getOrNull()?.let { bytes -> firstHeading(bytes.decodeToString()) }
+					}.getOrNull()
+				}
+			}
+			if (publication !== opened.publication || titles.all { it == null }) return@launch
+			tocAdapter.submit(opened.toc.withTitles(titles))
+			updateFooter()
 		}
 	}
 
@@ -1303,8 +1339,11 @@ class MainActivity : AppCompatActivity() {
 			Section.LIBRARY -> libraryAdapter.refresh(book?.id)
 			Section.CONTENTS -> {
 				val empty = tocAdapter.itemCount == 0
-				tocEmpty.isVisible = empty
-				if (empty) tocEmpty.setText(if (navigator == null) R.string.no_contents else R.string.no_toc)
+				tocEmpty.isVisible = empty || showsSections
+				when {
+					empty -> tocEmpty.setText(if (navigator == null) R.string.no_contents else R.string.no_toc)
+					showsSections -> tocEmpty.setText(R.string.toc_sections)
+				}
 				tocAdapter.activeIndex.takeIf { it >= 0 }?.let { tocList.scrollToPosition(it) }
 			}
 			Section.STYLES -> refreshFonts()
@@ -1470,6 +1509,8 @@ class MainActivity : AppCompatActivity() {
 		const val COVER_PRELOAD_DELAY_MS = 2_000L
 		const val JUMP_TIMEOUT_MS = 3_000L
 		const val SAME_CHAPTER_JUMP_TIMEOUT_MS = 500L
+		/** Where a section's first heading is looked for: its opening bytes. */
+		const val SECTION_HEADING_BYTES = 16_384L
 		const val KEY_REPEAT_MS = 250L
 		const val BAR_CONTROL_TIMEOUT_MS = 100L
 		const val RENDERER_RETRY_MS = 10_000L

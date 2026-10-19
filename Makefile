@@ -4,10 +4,10 @@
 export JAVA_HOME ?= /opt/homebrew/opt/openjdk@17
 
 reader:
-	npx serve -s web-reader -l 5050
+	npx serve docs -l 5050
 
 site:
-	npx serve site -l 5051
+	npx serve docs -l 5051
 
 android:
 	cd android && ./gradlew assembleDebug

@@ -27,6 +27,8 @@
   <string name="fonts_allow">Choose fonts folder</string>
   <string name="no_contents">Open a book to see its table of contents.</string>
   <string name="no_toc">This book has no table of contents.</string>
+  <string name="toc_sections">This book has no table of contents. Its sections, in order:</string>
+  <string name="toc_section">Section %1$d</string>
   <string name="zones_heading">Tap zone actions</string>
   <string name="zones_hint">Tap a zone to cycle its action. For right-to-left books, the grid is mirrored.</string>
   <string name="zone_prev">‹ Prev</string>

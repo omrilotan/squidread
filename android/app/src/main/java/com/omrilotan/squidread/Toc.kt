@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.text.HtmlCompat
 import androidx.recyclerview.widget.RecyclerView
 import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
@@ -44,6 +45,44 @@ fun buildToc(links: List<Link>): List<TocEntry> {
 	visit(links, 0, "")
 	return entries
 }
+
+/**
+ * Stands in for a missing table of contents: one entry per file of the reading order, in order.
+ * Titles come from the book where it names its files, and from [label] where it doesn't.
+ */
+fun buildSections(readingOrder: List<Link>, label: (number: Int) -> String): List<TocEntry> =
+	readingOrder.mapIndexed { index, link ->
+		TocEntry(
+			link = link,
+			title = Library.cleanTitle(link.title) ?: label(index + 1),
+			depth = 0,
+			number = "${index + 1}",
+			path = link.url().pathWithoutFragment(),
+			index = index,
+		)
+	}
+
+/** The same entries, with the titles found in the files themselves where there are any. */
+fun List<TocEntry>.withTitles(titles: List<String?>): List<TocEntry> =
+	mapIndexed { index, entry ->
+		titles.getOrNull(index)?.let { title ->
+			TocEntry(entry.link, title, entry.depth, entry.number, entry.path, entry.index)
+		} ?: entry
+	}
+
+/**
+ * The text of the first heading in a file's opening bytes, if it has one. A rough reading that
+ * needs no parser: headings are short and come early.
+ */
+fun firstHeading(html: String): String? {
+	val match = HEADING.find(html) ?: return null
+	val text = HtmlCompat.fromHtml(match.groupValues[1], HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
+	// Images in a heading come through as object placeholders.
+	return Library.cleanTitle(text.replace('\uFFFC', ' ').replace(WHITESPACE, " ").trim())
+}
+
+private val HEADING = Regex("<h[1-6][^>]*>(.*?)</h[1-6]\\s*>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+private val WHITESPACE = Regex("\\s+")
 
 private const val MAX_DEPTH = 32
 
