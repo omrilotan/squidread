@@ -2,10 +2,11 @@
   "name": "Squidread",
   "short_name": "Squidread",
   "description": "A fast, distraction-free EPUB reader for e-ink",
-  "start_url": "/",
+  "id": "./",
+  "start_url": "./",
   "display": "standalone",
   "display_override": ["fullscreen", "standalone"],
-  "scope": "/",
+  "scope": "./",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
   "orientation": "portrait-primary",
@@ -39,14 +40,14 @@
   ],
   "file_handlers": [
     {
-      "action": "/",
+      "action": "./",
       "accept": {
         "application/epub+zip": [".epub"]
       }
     }
   ],
   "share_target": {
-    "action": "/",
+    "action": "./",
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {

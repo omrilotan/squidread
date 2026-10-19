@@ -10,7 +10,7 @@ Reading ePub files
 
 ## Web reader
 
-`web-reader/` is the progressive web app, deployed as static assets.
+`docs/reader/` is the progressive web app, published with the website at [omrilotan.com/squidread/reader](https://omrilotan.com/squidread/reader/). It shares the website's mascot and favicon.
 
 ## Website
 
