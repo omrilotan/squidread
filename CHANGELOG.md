@@ -2,6 +2,11 @@
 
 Releases of the Android app. Each entry's notes are what goes into Google Play's "Release notes" (500 characters at most).
 
+## 1.0.0-rc-20261020 (versionCode 6)
+
+- Deleting the book you're reading now keeps you in the library, instead of closing Squidread.
+- In the library, "+ Add EPUB" now comes after your books.
+
 ## 1.0.0-rc-20261019 (versionCode 5)
 
 - Books without a table of contents now list their sections in Contents, named after each section's heading, so you can jump between them.

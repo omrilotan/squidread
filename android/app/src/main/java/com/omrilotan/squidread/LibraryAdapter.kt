@@ -18,8 +18,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * "Add EPUB" tile followed by the books, most recently opened first. While there are no books, a
- * tile suggesting free books follows it, then [emptyHint] across the whole row.
+ * The books, most recently opened first, then the "Add EPUB" tile. While there are no books, a
+ * tile suggesting free books comes before it, and [emptyHint] follows across the whole row.
  */
 class LibraryAdapter(
 	private val library: Library,
@@ -57,9 +57,9 @@ class LibraryAdapter(
 	override fun getItemCount() = if (books.isEmpty()) 3 else books.size + 1
 
 	override fun getItemViewType(position: Int) = when {
-		position == 0 -> TYPE_ADD
-		books.isNotEmpty() -> TYPE_BOOK
-		position == 1 -> TYPE_SUGGESTION
+		books.isNotEmpty() -> if (position < books.size) TYPE_BOOK else TYPE_ADD
+		position == 0 -> TYPE_SUGGESTION
+		position == 1 -> TYPE_ADD
 		else -> TYPE_HINT
 	}
 
@@ -86,7 +86,7 @@ class LibraryAdapter(
 	override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
 		when (holder) {
 			is AddHolder -> holder.bind()
-			is BookHolder -> holder.bind(books[position - 1])
+			is BookHolder -> holder.bind(books[position])
 		}
 	}
 

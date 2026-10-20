@@ -558,13 +558,13 @@ class MainActivity : AppCompatActivity() {
 
 	private fun libraryColumns() = (resources.configuration.screenWidthDp / LIBRARY_COLUMN_DP).coerceIn(2, 6)
 
-	/** The books that fit on the first screen of the library, after the "Add EPUB" tile. */
+	/** The books that fit on the first screen of the library. */
 	private fun firstScreenOfBooks(): Int {
 		val configuration = resources.configuration
 		val columns = libraryColumns()
 		val tileHeight = configuration.screenWidthDp / columns * 3 / 2 + LIBRARY_TITLE_DP
 		val rows = configuration.screenHeightDp / tileHeight.coerceAtLeast(1) + 1
-		return columns * rows - 1
+		return columns * rows
 	}
 
 	private suspend fun preloadCovers() {
@@ -937,11 +937,18 @@ class MainActivity : AppCompatActivity() {
 				library.delete(selected.id)
 				if (prefs.lastBookId == selected.id) prefs.lastBookId = null
 				if (selected.id == taskBookId) {
-					finishAndRemoveTask()
+					// This task's book is gone; it stays open as a library task, on the library.
+					taskBookId = null
+					releasedBook = null
+					openJob?.cancel()
+					hideLoading()
+					closeBook()
+					setTaskDescription(ActivityManager.TaskDescription())
+					showNoBook(true)
 				} else {
 					BookTasks.remove(this, selected.id)
-					libraryAdapter.refresh(book?.id)
 				}
+				libraryAdapter.refresh(book?.id)
 			}
 			.setNegativeButton(R.string.cancel, null)
 			.show()
