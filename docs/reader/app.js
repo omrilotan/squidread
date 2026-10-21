@@ -838,6 +838,34 @@ function renderToc(tocItems = []) {
   addItems(tocItems);
 }
 
+// A block holding one picture and no text is a page of a comic or a picture
+// book, often in a box of fixed pixels (Kindle comics use 880 by 1280).
+// Taller than the page, it spills onto blank pages after it; keep it to one.
+function fitImagePages(doc) {
+  if (!doc.getElementById('squidread-image-pages')) {
+    const style = doc.createElement('style');
+    style.id = 'squidread-image-pages';
+    style.textContent = `
+      .squidread-image-page {
+        max-width: 100% !important;
+        max-height: 90vh !important;
+        overflow: hidden !important;
+        break-inside: avoid;
+      }
+    `;
+    doc.head.appendChild(style);
+  }
+  for (const el of doc.body.children) {
+    if (el.textContent.trim()) continue;
+    const sources = new Set(
+      [...el.querySelectorAll('img, image')].map(
+        (img) => img.getAttribute('src') || img.getAttribute('href') || img.getAttribute('xlink:href'),
+      ),
+    );
+    if (sources.size === 1) el.classList.add('squidread-image-page');
+  }
+}
+
 // Cache for injected iframes to avoid repeated DOM checks
 const injectedIframes = new WeakSet();
 
@@ -856,10 +884,15 @@ function injectContentCSS() {
       if (!doc.querySelector('#squidread-content-styles')) {
         const style = doc.createElement('style');
         style.id = 'squidread-content-styles';
+        // epub.js caps img and svg at the page size in pixels. A percentage
+        // cap would shrink them to nothing in a box that has no width of its
+        // own, like the absolutely positioned pages of Kindle comics.
         style.textContent = `
           img, svg, video, canvas, iframe {
-            max-width: 100% !important;
             height: auto !important;
+          }
+          video, canvas, iframe {
+            max-width: 100% !important;
           }
           /* Taps turn pages; text selection swallows them */
           html, body {
@@ -1043,6 +1076,7 @@ async function loadBook(id) {
         doc.addEventListener('click', handleRenditionContentPointer, true);
         doc.addEventListener('keydown', handleReaderKeydown);
       }
+      fitImagePages(doc);
     } catch (error) {
       log.debug('Failed to bind rendition content hooks:', error);
     }
@@ -1362,8 +1396,12 @@ function updatePosition(location) {
   
   // Update overall book progress
   let percentage = 0;
-  if (locationsReady && book?.locations?.length) {
+  const spineLength = book?.spine?.length || 0;
+  if (locationsReady && book.locations.length() >= spineLength) {
     percentage = (location.start?.location / book.locations.total) * 100;
+  } else if (spineLength) {
+    // Locations count text, so a book of pictures has few or none of them.
+    percentage = (location.start?.index / spineLength) * 100;
   }
   if (Number.isFinite(percentage)) {
     const rounded = Math.min(100, Math.max(0, percentage));
