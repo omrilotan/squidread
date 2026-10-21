@@ -8,6 +8,11 @@
   <string name="tab_settings">Settings</string>
   <string name="no_book">No book selected</string>
   <string name="select_book">Select a book</string>
+  <string name="end_title">The end</string>
+  <string name="end_delete">Delete from library</string>
+  <string name="end_library">Go to library</string>
+  <string name="end_restart">Jump to the beginning</string>
+  <string name="end_close">Back to the last page</string>
   <string name="reader_intro_title">This is where you read</string>
   <string name="reader_intro_text">Your book shows up here, one page at a time.</string>
   <string name="reader_intro_zones">Tap the right side for the next page, the left for the previous one, and the middle for the menu.</string>

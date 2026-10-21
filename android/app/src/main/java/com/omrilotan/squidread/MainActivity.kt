@@ -104,6 +104,8 @@ class MainActivity : AppCompatActivity() {
 	private lateinit var readerIntroLogo: View
 	private lateinit var readerIntroZones: View
 	private lateinit var readerSelect: View
+	private lateinit var bookEnd: View
+	private lateinit var bookEndTitle: TextView
 	private lateinit var loadingView: View
 	private lateinit var loadingCover: ImageView
 	private lateinit var loadingTitle: TextView
@@ -142,6 +144,9 @@ class MainActivity : AppCompatActivity() {
 	private var firstPageJob: Job? = null
 	private var currentLocator: Locator? = null
 	private var pageInChapter: String? = null
+
+	/** On the last page of the book's last file: the next page is the end screen. */
+	private var onLastPage = false
 	private var section = Section.STYLES
 	private var loadingTimeout: Job? = null
 	private var awaitingFirstPage = false
@@ -240,6 +245,7 @@ class MainActivity : AppCompatActivity() {
 			val nav = navigator
 			when {
 				menu.isVisible -> closeMenu()
+				bookEnd.isVisible -> showEnd(false)
 				nav != null && linkHistory.isNotEmpty() -> nav.go(linkHistory.removeAt(linkHistory.lastIndex), animated = false)
 				else -> moveTaskToBack(true)
 			}
@@ -463,6 +469,13 @@ class MainActivity : AppCompatActivity() {
 		readerSelect = findViewById(R.id.reader_select)
 		findViewById<View>(R.id.reader_message_content).setOnClickListener { openMenu(Section.LIBRARY) }
 		readerSelect.setOnClickListener { openMenu(Section.LIBRARY) }
+		bookEnd = findViewById(R.id.book_end)
+		bookEndTitle = findViewById(R.id.book_end_title)
+		bookEnd.setOnClickListener { handleTap(readerArea.lastDownX, readerArea.lastDownY) }
+		findViewById<View>(R.id.book_end_delete).setOnClickListener { book?.let(::confirmDelete) }
+		findViewById<View>(R.id.book_end_library).setOnClickListener { openMenu(Section.LIBRARY) }
+		findViewById<View>(R.id.book_end_restart).setOnClickListener { goToBeginning() }
+		findViewById<View>(R.id.book_end_close).setOnClickListener { showEnd(false) }
 		findViewById<View>(R.id.reader_add).setOnClickListener { pickEpub() }
 		findViewById<View>(R.id.reader_example).setOnClickListener {
 			openExternal(Uri.parse(getString(R.string.gutenberg_example_url)))
@@ -734,6 +747,7 @@ class MainActivity : AppCompatActivity() {
 	private fun showLoading(selected: Book) {
 		closeMenu()
 		showNoBook(false)
+		showEnd(false)
 		loadingTitle.text = selected.title
 		val coverFile = library.coverFile(selected.id)
 		val cached = app.covers.cached(selected.id)
@@ -902,6 +916,8 @@ class MainActivity : AppCompatActivity() {
 	}
 
 	private fun closeBook() {
+		showEnd(false)
+		onLastPage = false
 		locatorJob?.cancel()
 		locatorJob = null
 		firstPageJob?.cancel()
@@ -945,6 +961,8 @@ class MainActivity : AppCompatActivity() {
 					closeBook()
 					setTaskDescription(ActivityManager.TaskDescription())
 					showNoBook(true)
+					// Deleted from the end screen: on to the next book. An empty library has its own screen.
+					if (!menu.isVisible && library.all().isNotEmpty()) openMenu(Section.LIBRARY)
 				} else {
 					BookTasks.remove(this, selected.id)
 				}
@@ -1001,6 +1019,10 @@ class MainActivity : AppCompatActivity() {
 			// Readium counts columns from the left; right-to-left books start on the rightmost one.
 			val page = if (isRtl()) totalPages - pageIndex else pageIndex + 1
 			pageInChapter = "$page/$totalPages"
+			val lastFile = publication?.readingOrder?.lastOrNull()?.url()
+			onLastPage = page == totalPages && lastFile != null && locator.href.removeFragment().isEquivalent(lastFile)
+			// Moved away from the end, by the contents or a new layout: the page itself shows.
+			if (!onLastPage) showEnd(false)
 			updateFooter()
 			if (pendingJump != null) closeMenu()
 			preRasterWebViews(navigator?.view)
@@ -1077,11 +1099,30 @@ class MainActivity : AppCompatActivity() {
 	private fun isRtl() = navigator?.settings?.value?.readingProgression == ReadingProgression.RTL
 
 	private fun goNext() {
-		navigator?.goForward(animated = false)
+		val nav = navigator ?: return
+		if (bookEnd.isVisible) return
+		// Readium has no page after the last one, and says so only for fixed-layout books.
+		if (onLastPage || !nav.goForward(animated = false)) showEnd(true)
 	}
 
 	private fun goPrevious() {
+		// Back from the end screen to the last page, which is still in place under it.
+		if (bookEnd.isVisible) return showEnd(false)
 		navigator?.goBackward(animated = false)
+	}
+
+	private fun showEnd(visible: Boolean) {
+		if (bookEnd.isVisible == visible) return
+		if (visible) bookEndTitle.text = book?.title
+		bookEnd.isVisible = visible
+	}
+
+	private fun goToBeginning() {
+		val nav = navigator ?: return
+		val first = publication?.readingOrder?.firstOrNull() ?: return
+		linkHistory.clear()
+		showEnd(false)
+		nav.go(first, animated = false)
 	}
 
 	private fun onSwipe(leftward: Boolean) {
@@ -1093,6 +1134,7 @@ class MainActivity : AppCompatActivity() {
 	private fun navigateTo(entry: TocEntry) {
 		// A jump from the contents starts a new trail; Back no longer returns to old links.
 		linkHistory.clear()
+		showEnd(false)
 		val nav = navigator ?: return closeMenu()
 		val opened = publication ?: return closeMenu()
 		val here = currentLocator?.href?.removeFragment()?.toString()

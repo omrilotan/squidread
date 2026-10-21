@@ -2,6 +2,10 @@
 
 Releases of the Android app. Each entry's notes are what goes into Google Play's "Release notes" (500 characters at most).
 
+## 1.0.0-rc-20261021 (versionCode 7)
+
+- Turning past the last page shows "The end", with a way to start the book again, go to the library, or delete the book. Close it to go back to the last page.
+
 ## 1.0.0-rc-20261020 (versionCode 6)
 
 - Deleting the book you're reading now keeps you in the library, instead of closing Squidread.

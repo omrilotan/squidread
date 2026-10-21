@@ -176,6 +176,108 @@
         </LinearLayout>
       </ScrollView>
 
+      <!--
+        After the last page: what to do with a finished book. Taps around the buttons work as tap
+        zones do, so turning back returns to the last page. "Go to library" sits in the middle,
+        where a tap for the menu lands; Delete is kept away from it.
+      -->
+      <FrameLayout
+        android:id="@+id/book_end"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/paper"
+        android:clickable="true"
+        android:focusable="false"
+        android:visibility="gone">
+
+        <LinearLayout
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
+          android:gravity="center_horizontal"
+          android:orientation="vertical"
+          android:paddingStart="24dp"
+          android:paddingEnd="24dp">
+
+          <!-- Equal halves above and below keep "Go to library" in the middle. -->
+          <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="bottom|center_horizontal"
+            android:orientation="vertical">
+
+            <TextView
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:gravity="center"
+              android:text="@string/end_title"
+              android:textColor="@color/ink"
+              android:textSize="20sp"
+              android:textStyle="bold" />
+
+            <TextView
+              android:id="@+id/book_end_title"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:paddingTop="8dp"
+              android:gravity="center"
+              android:maxLines="3"
+              android:ellipsize="end"
+              android:textColor="@color/ink"
+              android:textDirection="firstStrong"
+              android:textSize="16sp" />
+
+            <TextView
+              android:id="@+id/book_end_restart"
+              style="@style/Squidread.Button"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="24dp"
+              android:layout_marginBottom="12dp"
+              android:minWidth="240dp"
+              android:text="@string/end_restart" />
+          </LinearLayout>
+
+          <TextView
+            android:id="@+id/book_end_library"
+            style="@style/Squidread.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="240dp"
+            android:text="@string/end_library" />
+
+          <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="top|center_horizontal"
+            android:orientation="vertical">
+
+            <TextView
+              android:id="@+id/book_end_delete"
+              style="@style/Squidread.Button"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="12dp"
+              android:minWidth="240dp"
+              android:text="@string/end_delete" />
+          </LinearLayout>
+        </LinearLayout>
+
+        <!-- Back to the last page, placed like the menu's close button. -->
+        <TextView
+          android:id="@+id/book_end_close"
+          style="@style/Squidread.Button"
+          android:layout_width="48dp"
+          android:layout_height="48dp"
+          android:layout_gravity="top|end"
+          android:layout_margin="8dp"
+          android:contentDescription="@string/end_close"
+          android:paddingStart="0dp"
+          android:paddingEnd="0dp"
+          android:text="@string/close_symbol" />
+      </FrameLayout>
+
       <!-- Shown from the moment a book is chosen until its first page is drawn. -->
       <LinearLayout
         android:id="@+id/loading"
