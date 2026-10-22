@@ -81,7 +81,7 @@ fun firstHeading(html: String): String? {
 	return Library.cleanTitle(text.replace('\uFFFC', ' ').replace(WHITESPACE, " ").trim())
 }
 
-private val HEADING = Regex("<h[1-6][^>]*>(.*?)</h[1-6]\\s*>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+private val HEADING = Regex("<h[1-6][^>]{0,500}>(.{0,1000}?)</h[1-6]\\s*>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
 private val WHITESPACE = Regex("\\s+")
 
 private const val MAX_DEPTH = 32

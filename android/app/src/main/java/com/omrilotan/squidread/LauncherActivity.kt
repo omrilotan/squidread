@@ -100,11 +100,13 @@ class LauncherActivity : AppCompatActivity() {
 
 	private fun displayName(uri: Uri): String? = runCatching {
 		contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-			if (cursor.moveToFirst()) cursor.getString(0) else null
+			// The sending app chooses the name; a real one is short.
+			if (cursor.moveToFirst()) cursor.getString(0)?.take(MAX_NAME_LENGTH) else null
 		}
 	}.getOrNull() ?: uri.lastPathSegment?.substringAfterLast('/')?.substringAfterLast(':')
 
 	private companion object {
 		const val NAME_WAIT_MS = 150L
+		const val MAX_NAME_LENGTH = 1000
 	}
 }

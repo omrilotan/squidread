@@ -2,6 +2,12 @@
 
 Releases of the Android app. Each entry's notes are what goes into Google Play's "Release notes" (500 characters at most).
 
+## 1.0.0-rc-20261022 (versionCode 8)
+
+- A smaller app: about a third smaller to download.
+- Safer with books from anywhere: a book's pages can no longer read other apps' files, and what a book stores is cleared before the next book opens.
+- Importing stops before your device runs out of space, and damaged or booby-trapped files that would unpack to enormous sizes are refused.
+
 ## 1.0.0-rc-20261021 (versionCode 7)
 
 - Turning past the last page shows "The end", with a way to start the book again, go to the library, or delete the book. Close it to go back to the last page.

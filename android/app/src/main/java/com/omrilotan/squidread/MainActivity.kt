@@ -19,6 +19,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.webkit.WebStorage
 import android.webkit.WebView
 import android.widget.GridLayout
 import android.widget.ImageView
@@ -208,9 +209,10 @@ class MainActivity : AppCompatActivity() {
 		override fun onReceive(context: Context, intent: Intent) = updateClock()
 	}
 
-	/** Wraps each page's web view as Readium creates it; see [GuardedWebViewClient]. */
+	/** Locks down each page's web view as Readium creates it; see [GuardedWebViewClient]. */
 	private val webViewGuard = object : FragmentManager.FragmentLifecycleCallbacks() {
 		override fun onFragmentViewCreated(fm: FragmentManager, f: Fragment, v: View, savedInstanceState: Bundle?) {
+			denyLocalFiles(v)
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) guardWebViews(v)
 		}
 	}
@@ -802,6 +804,21 @@ class MainActivity : AppCompatActivity() {
 		}
 	}
 
+	/**
+	 * Readium serves every page and font itself, from its own web address, so a book's pages
+	 * never need the device's files or other apps' content (content://, which web views may
+	 * otherwise read from).
+	 */
+	private fun denyLocalFiles(view: View) {
+		when (view) {
+			is WebView -> view.settings.apply {
+				allowContentAccess = false
+				allowFileAccess = false
+			}
+			is ViewGroup -> for (index in 0 until view.childCount) denyLocalFiles(view.getChildAt(index))
+		}
+	}
+
 	@RequiresApi(Build.VERSION_CODES.O)
 	private fun guardWebViews(view: View) {
 		when (view) {
@@ -880,6 +897,9 @@ class MainActivity : AppCompatActivity() {
 		// Before any web view exists, so no book's script runs with cookies on. Usually done
 		// already, while the book was parsed.
 		app.prepareWebView()
+		// Books share one web address, so what a book's script stored must not reach the next
+		// book; another book open in a different task loses its stored data too.
+		WebStorage.getInstance().deleteAllData()
 		val configuration = EpubNavigatorFragment.Configuration(shouldApplyInsetsPadding = false)
 		val families = fonts.families
 		fonts.declare(configuration, families)
@@ -1182,7 +1202,9 @@ class MainActivity : AppCompatActivity() {
 
 	private fun showFootnote(html: String): AlertDialog {
 		val dialog = AlertDialog.Builder(this)
-			.setMessage(HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_COMPACT).trimEnd())
+			// The book's script can set the note to anything; a note is never this long, and parsing
+			// an endless one would hold up the screen.
+			.setMessage(HtmlCompat.fromHtml(html.take(MAX_NOTE_LENGTH), HtmlCompat.FROM_HTML_MODE_COMPACT).trimEnd())
 			.setPositiveButton(android.R.string.ok, null)
 			.create()
 		val dialogWindow = dialog.window
@@ -1567,6 +1589,7 @@ class MainActivity : AppCompatActivity() {
 		const val MAX_PENDING_TAPS = 2
 		const val MAX_LINK_HISTORY = 20
 		const val MAX_LINK_LENGTH = 4096
+		const val MAX_NOTE_LENGTH = 16 * 1024
 		const val MAX_LOADED_READERS = 3
 		const val LIBRARY_COLUMN_DP = 140
 		const val LIBRARY_TITLE_DP = 48

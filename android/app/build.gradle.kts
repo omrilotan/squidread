@@ -11,14 +11,24 @@ android {
 		minSdk = 24
 		targetSdk = 36
 		// Only ever increases; devices already have test builds up to 5 installed.
-		versionCode = 7
-		versionName = "1.0.0-rc-20261021"
+		versionCode = 8
+		versionName = "1.0.0-rc-20261022"
 	}
 
 	// Readium's page script and styles load into every chapter; stored uncompressed, they are
 	// read straight from the APK instead of being inflated each time.
 	androidResources {
 		noCompress += listOf("readium-reflowable.js", ".css")
+		// The app is in English only; the libraries' translations of their own strings would
+		// never show.
+		localeFilters += "en"
+		// Readium assets this app never uses: the player for Divina comics (only EPUBs open
+		// here), and fonts that load only when chosen as the book's font, which Squidread
+		// doesn't offer. The rest are aapt's defaults.
+		ignoreAssetsPattern = listOf(
+			"!.svn", "!.git", "!.ds_store", "!*.scc", ".*", "<dir>_*", "!CVS", "!thumbs.db", "!picasa.ini", "!*~",
+			"<dir>divina", "AccessibleDfA.otf", "iAWriterDuospace-Regular.ttf", "OpenDyslexic-Regular.otf",
+		).joinToString(":")
 	}
 
 	// Release signing comes from ~/.gradle/gradle.properties, never from the repo.
@@ -48,6 +58,12 @@ android {
 		// Readium uses java.time and other newer JDK APIs on old Android versions.
 		isCoreLibraryDesugaringEnabled = true
 	}
+}
+
+// Kotlin's reflection library is a third of the app's code, and Readium uses it in one place
+// only; see proguard-rules.pro.
+configurations.matching { it.name.endsWith("RuntimeClasspath") }.configureEach {
+	exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
 }
 
 dependencies {

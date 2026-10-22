@@ -209,6 +209,9 @@ class Library(private val context: Context, private val covers: CoverCache) {
 		scope.launch(writer) {
 			context.cacheDir.listFiles { file -> file.name.startsWith(TEMP_PREFIX) && file.lastModified() < started }
 				?.forEach { it.delete() }
+			// And rewrites of books with repeated entries; see dropDuplicateEntries.
+			booksDir.listFiles { file -> file.name.endsWith(".tmp") && file.lastModified() < started }
+				?.forEach { it.delete() }
 		}
 	}
 
@@ -224,12 +227,17 @@ class Library(private val context: Context, private val covers: CoverCache) {
 					// Bounded, so a source that never ends can't fill the device.
 					val buffer = ByteArray(BUFFER_SIZE)
 					var total = 0L
+					if (temp.usableSpace < MIN_FREE_BYTES) throw IOException("Low on storage")
 					while (true) {
 						ensureActive()
 						val count = stream.read(buffer)
 						if (count < 0) break
 						total += count
 						if (total > MAX_IMPORT_BYTES) throw IOException("Too large")
+						// Other apps can send files without asking; never fill the device.
+						if (total % SPACE_CHECK_BYTES < count && temp.usableSpace < MIN_FREE_BYTES) {
+							throw IOException("Low on storage")
+						}
 						output.write(buffer, 0, count)
 					}
 				}
@@ -254,14 +262,18 @@ class Library(private val context: Context, private val covers: CoverCache) {
 	/**
 	 * Rejects archives whose entries claim to be larger than the archive itself, which is
 	 * impossible in a real file. Readium sizes its page positions from those claims, so a forged
-	 * one would run the reader out of memory every time the book opened. Reads only the archive's
-	 * directory. Archives java.util.zip can't read at all are left for Readium to judge.
+	 * one would run the reader out of memory every time the book opened. Also rejects entries that
+	 * unpack to more than any chapter or picture needs, which only an archive built to expand
+	 * without end has. Reads only the archive's directory. Archives java.util.zip can't read at
+	 * all are left for Readium to judge.
 	 */
 	private fun isPlausibleArchive(file: File): Boolean = try {
 		val limit = file.length()
 		ZipFile(file).use { zip ->
 			zip.entries().asSequence().all { entry ->
-				entry.compressedSize in 0..limit && (entry.method != ZipEntry.STORED || entry.size in 0..limit)
+				entry.compressedSize in 0..limit &&
+					(entry.method != ZipEntry.STORED || entry.size in 0..limit) &&
+					entry.size <= MAX_ENTRY_BYTES
 			}
 		}
 	} catch (error: IOException) {
@@ -375,6 +387,9 @@ class Library(private val context: Context, private val covers: CoverCache) {
 		private const val NAME_TIMEOUT_MS = 2_000L
 		private const val BUFFER_SIZE = 64 * 1024
 		private const val MAX_IMPORT_BYTES = 1L shl 30
+		private const val MAX_ENTRY_BYTES = 256L shl 20
+		private const val MIN_FREE_BYTES = 256L shl 20
+		private const val SPACE_CHECK_BYTES = 16L shl 20
 		private const val COVER_WIDTH = 300
 		private const val COVER_HEIGHT = 450
 		private const val MAX_COVER_BYTES = 20L shl 20
