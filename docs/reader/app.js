@@ -1,4 +1,4 @@
-import { openDB } from 'https://unpkg.com/idb?module';
+import { openDB } from './vendor/idb.js';
 
 const libraryEl = document.getElementById('library');
 const closePanelBtn = document.getElementById('closePanel');
@@ -25,13 +25,21 @@ const wait = (ms) => new Promise((res) => setTimeout(res, ms));
 
 // --- Lazy-load heavy reader deps -------------------------------------------
 // EPUB.js (+ JSZip) are large; loading them only when needed keeps startup fast.
-const EPUB_SCRIPT_URLS = [
-  'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',
-  'https://cdn.jsdelivr.net/npm/epubjs@0.3/dist/epub.min.js',
+// Exact versions, checked against their hashes: a changed file never runs.
+const EPUB_SCRIPTS = [
+  {
+    src: 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',
+    integrity: 'sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG',
+  },
+  {
+    src: 'https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js',
+    integrity: 'sha384-ZqmkDa/1AGF4SKdSmXgEG+3G+Gsb6yNqUSq2Mqp0jDf1GWk+UY5eNbEd7hgwiywI',
+  },
 ];
 let epubDepsPromise = null;
+const MAX_BOOK_BYTES = 500 * 1024 * 1024;
 
-function loadScript(src) {
+function loadScript({ src, integrity }) {
   return new Promise((resolve, reject) => {
     const existing = document.querySelector(`script[src="${src}"]`);
     if (existing) {
@@ -43,6 +51,8 @@ function loadScript(src) {
 
     const script = document.createElement('script');
     script.src = src;
+    script.integrity = integrity;
+    script.crossOrigin = 'anonymous';
     script.async = true;
     script.onload = () => {
       script.dataset.loaded = '1';
@@ -57,7 +67,7 @@ async function ensureEpubDepsLoaded() {
   if (typeof window.ePub === 'function') return;
   if (!epubDepsPromise) {
     epubDepsPromise = (async () => {
-      for (const url of EPUB_SCRIPT_URLS) await loadScript(url);
+      for (const script of EPUB_SCRIPTS) await loadScript(script);
       if (typeof window.ePub !== 'function') {
         throw new Error('EPUB deps loaded, but window.ePub is not available');
       }
@@ -633,6 +643,11 @@ function getDroppedEpubFile(dataTransfer) {
 }
 
 async function handleLocalFile(file) {
+  // Read whole into memory; a file this size isn't a book, and could stall the tab.
+  if (file.size > MAX_BOOK_BYTES) {
+    showToast('File too large');
+    return;
+  }
   if (isProcessing) {
     log.debug('Ignoring selection while processing');
     return;
@@ -915,9 +930,18 @@ function injectContentCSS() {
         links.forEach(link => {
           link.addEventListener('click', async (e) => {
             const href = link.getAttribute('href');
-            if (!href || href.startsWith('http')) return; // Skip external links
-            
+            if (!href) return;
             e.preventDefault();
+
+            // Links out of the book open in a new tab, never inside the reader.
+            let target = null;
+            try {
+              target = new URL(href, doc.baseURI);
+            } catch (error) {}
+            if (target && (target.protocol === 'http:' || target.protocol === 'https:')) {
+              window.open(target.href, '_blank', 'noopener,noreferrer');
+              return;
+            }
             
             try {
               // Try direct navigation first
@@ -935,7 +959,8 @@ function injectContentCSS() {
                   await rendition.display(targetSpine);
                   // Try to scroll to anchor after display
                   setTimeout(() => {
-                    const targetEl = doc.querySelector(`#${anchor}, [name="${anchor}"]`);
+                    // The book chooses the anchor; looked up by name, never as a selector.
+                    const targetEl = doc.getElementById(anchor) || doc.getElementsByName(anchor)[0];
                     if (targetEl) targetEl.scrollIntoView();
                   }, 100);
                 } else {
@@ -1063,7 +1088,9 @@ async function loadBook(id) {
     width: '100%',
     height: '100%',
     spread: 'none',
-    allowScriptedContent: true,
+    // Books' own scripts stay off: their pages share the reader's origin, so a script could
+    // read every stored book, change the reader, or replace its offline copy.
+    allowScriptedContent: false,
   });
 
   rendition.hooks.content.register((contents) => {
@@ -1483,7 +1510,7 @@ function updateChapterInfo(location) {
         item.classList.remove('active');
       });
       // Set active state on matching item
-      const activeButton = tocListEl.querySelector(`.tocItem[data-href="${activeHref}"]`);
+      const activeButton = [...tocListEl.querySelectorAll('.tocItem')].find((item) => item.dataset.href === activeHref);
       if (activeButton) {
         activeButton.classList.add('active');
       }

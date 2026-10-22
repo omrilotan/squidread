@@ -1,4 +1,4 @@
-const CACHE_NAME = 'squidread-shell-v7';
+const CACHE_NAME = 'squidread-shell-v8';
 // Relative to this script, so the reader works from any folder (omrilotan.com/squidread/reader/).
 // The mascot and favicon are the website's, one folder up.
 const ASSETS = [
@@ -6,10 +6,18 @@ const ASSETS = [
   'index.html',
   'styles.css',
   'app.js',
+  'vendor/idb.js',
   '../favicon.png',
   '../icon.png',
-  'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',
-  'https://cdn.jsdelivr.net/npm/epubjs@0.3/dist/epub.min.js',
+  // Checked against the same hashes as in app.js, so a tampered copy is never kept.
+  new Request('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', {
+    mode: 'cors',
+    integrity: 'sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG',
+  }),
+  new Request('https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js', {
+    mode: 'cors',
+    integrity: 'sha384-ZqmkDa/1AGF4SKdSmXgEG+3G+Gsb6yNqUSq2Mqp0jDf1GWk+UY5eNbEd7hgwiywI',
+  }),
 ];
 
 self.addEventListener('install', (event) => {

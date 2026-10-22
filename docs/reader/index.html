@@ -3,6 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <!--
+    Only the reader's own scripts and the two pinned libraries run; books' pages (which share
+    this origin) inherit it. Books' styles, pictures and fonts arrive as blob: and data: URLs.
+    The hash is of the theme script below; change it with that script.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'sha256-EbYgQ7Fa6JieAGJg5OBBf8rVJijJ+2lVkWJbdKDBOxA='; style-src 'self' 'unsafe-inline' blob: data:; img-src 'self' blob: data:; font-src 'self' blob: data:; media-src 'self' blob: data:; connect-src 'self' blob: data: https://cdn.jsdelivr.net; frame-src 'self' blob: about:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'" />
   <meta name="description" content="A fast, distraction-free EPUB reader for e-ink" />
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
