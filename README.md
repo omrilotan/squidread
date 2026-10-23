@@ -1,34 +1,37 @@
-# Squidread
+![The Squidread squid, in glasses, reading on a tablet](mascot/banner.jpg)
 
-<center>
+<h1 align="center">Squidread</h1>
 
-![](mascot/Squid%20Read%20Flat.png)
+<p align="center">
+	A fast, distraction-free EPUB reader for Android, built for e-ink.
+</p>
 
-</center>
+<p align="center">
+	<a href="https://play.google.com/store/apps/details?id=com.omrilotan.squidread"><strong>Get it on Google Play</strong></a><br />
+	<a href="https://omrilotan.com/squidread/">Website</a> · <a href="CHANGELOG.md">Changelog</a> · <a href="https://omrilotan.com/squidread/reader/">Web reader</a>
+</p>
 
-Reading ePub files
 
-## Web reader
+| Distraction-free | Light or dark | Tap zones
+| - | - | -
+| ![](docs/screenshots/reader.png) | ![](docs/screenshots/dark.png) | ![](docs/screenshots/settings.png)
 
-`docs/reader/` is the progressive web app, published with the website at [omrilotan.com/squidread/reader](https://omrilotan.com/squidread/reader/). It shares the website's mascot and favicon.
+| Made for e-ink | Turn pages your way |
+| --- | --- |
+| Pure black and white, light or dark theme. No animations, ripples or shadows. Instant page turns. | Tap, swipe or page buttons. Choose what each tap zone does. Right-to-left books turn the right way. |
 
-## Website
+### Private, completely
 
-`docs/` is the project's landing page, published at [omrilotan.com/squidread](https://omrilotan.com/squidread/), with the [privacy policy](https://omrilotan.com/squidread/privacy/) under `docs/privacy/`.
+Squidread has no internet permission: **your books and your reading stay on your device.** No accounts, no ads, no analytics. Read the [privacy policy](https://omrilotan.com/squidread/privacy/).
 
-## Android
+## No Android device?
 
-`android/` is a native Kotlin app built for e-ink readers: low-power hardware and black-and-white, high-contrast screens.
+Try the [web reader](https://omrilotan.com/squidread/reader/) (alpha) in any modern browser. It can be installed as an app.
 
-- Rendering uses the [Readium Kotlin toolkit](https://github.com/readium/kotlin-toolkit). EPUB content is HTML, so pages are drawn by a WebView; everything else (unzipping, library, menus, gestures, page turns) is native.
-- Right-to-left books follow the book's page progression, or its language when that is missing. Tap zones and arrow keys mirror for RTL books, as in the web app.
-- E-ink: pure black and white, inverted in the dark theme (Settings: System, the default, Light or Dark), with no animations, ripples or shadows; page turns are instant, by tap, swipe or page-turn button (`PAGE_UP`/`PAGE_DOWN`); the footer only redraws when its text changes; the system bars appear and disappear at once with the menu.
-- Links: footnotes open over the page; Back returns to where a link was followed from. Books can't open other apps or the web on their own: only web and mail links the reader taps open, in another app.
-- Opens EPUB files only, without DRM. Malformed or hostile files are rejected when imported or opened rather than crashing the app.
-- Fonts: the styles menu can replace the book's fonts with any `.ttf`, `.otf`, `.woff` or `.woff2` file from the `fonts` folder at the root of the device's storage (where e-ink readers keep theirs). Android asks once for access to that folder. Files named like `Family-Bold.ttf` or `Family Bold Italic.ttf` are grouped into one family.
-- Registers for EPUB files, so it appears in "Open with" and the share sheet, and can be set as the default app for EPUB files ("Always" in the chooser, or the app's "Open by default" settings).
-- Private: no internet permission, no accounts, ads or analytics. Settings links to the website, the privacy policy and the open-source licenses (`app/src/main/assets/licenses.txt`, shown offline).
+## Contributing
 
-Requires JDK 17+ and the Android SDK (set `sdk.dir` in `android/local.properties` or `ANDROID_HOME`).
+Squidread is free and open source, released into the public domain. See [CONTRIBUTING.md](CONTRIBUTING.md) to build it or help out.
 
-`make android-release` builds the APK; `make android-bundle` builds the App Bundle for Google Play. Bump `versionCode` and `versionName` in `android/app/build.gradle.kts` for every release, and add its notes to [CHANGELOG.md](CHANGELOG.md).
+<p align="center">
+    · · · 🦑 · · ·
+</p>
