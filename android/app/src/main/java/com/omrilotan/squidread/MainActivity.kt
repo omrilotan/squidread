@@ -60,6 +60,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.readium.r2.navigator.HyperlinkNavigator
@@ -153,6 +155,9 @@ class MainActivity : AppCompatActivity() {
 	private var awaitingFirstPage = false
 	private var settingsBuilt = false
 	private var coversPreloaded = false
+
+	/** Text setting changes, applied one at a time; see [restyle]. */
+	private val restyling = Mutex()
 
 	/** The footer changed while the menu covered it; it is updated when the menu closes. */
 	private var footerStale = false
@@ -1426,10 +1431,24 @@ class MainActivity : AppCompatActivity() {
 
 	private fun setFontSize(value: Double) {
 		// Round to one decimal so repeated steps don't drift.
-		prefs.fontSize = ((value * 10).roundToInt() / 10.0)
+		val size = ((value * 10).roundToInt() / 10.0)
 			.coerceIn(ReaderPreferences.MIN_FONT_SIZE, ReaderPreferences.MAX_FONT_SIZE)
-		navigator?.submitPreferences(epubPreferences())
+		if (size == prefs.fontSize) return
+		prefs.fontSize = size
+		restyle()
 		updateFontSizeLabel()
+	}
+
+	/** Applies changed text settings, staying on the words that began the page. */
+	private fun restyle() {
+		val nav = navigator ?: return
+		lifecycleScope.launch {
+			restyling.withLock {
+				val kept = runCatching { nav.evaluateJavascript(KEEP_PLACE_SCRIPT) }.getOrNull() == "true"
+				nav.submitPreferences(epubPreferences())
+				if (kept) runCatching { nav.evaluateJavascript(RESTORE_PLACE_SCRIPT) }
+			}
+		}
 	}
 
 	private fun updateFontSizeLabel() {
@@ -1491,7 +1510,7 @@ class MainActivity : AppCompatActivity() {
 	private fun setFontFamily(family: String?) {
 		prefs.fontFamily = family
 		updateFontPicker()
-		if (family != null && family !in declaredFamilies) reloadNavigator() else navigator?.submitPreferences(epubPreferences())
+		if (family != null && family !in declaredFamilies) reloadNavigator() else restyle()
 	}
 
 	private fun cycleZone(index: Int) {

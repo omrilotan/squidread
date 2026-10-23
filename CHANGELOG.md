@@ -2,6 +2,10 @@
 
 Releases of the Android app. Each entry's notes are what goes into Google Play's "Release notes" (500 characters at most).
 
+## 1.0.0-rc-20261023 (versionCode 9)
+
+- Bug fix: Changing the font size or font keeps you on the words you were reading.
+
 ## 1.0.0-rc-20261022 (versionCode 8)
 
 - A smaller app: about a third smaller to download.
