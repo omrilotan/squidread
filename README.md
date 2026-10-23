@@ -1,4 +1,4 @@
-![The Squidread squid, in glasses, reading on a tablet](mascot/banner.jpg)
+![The Squidread squid, in glasses, reading on a tablet](mascot/banner.png)
 
 <h1 align="center">Squidread</h1>
 
