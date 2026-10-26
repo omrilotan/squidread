@@ -9,6 +9,7 @@ import android.os.Process
 import android.os.SystemClock
 import android.util.AtomicFile
 import android.util.Log
+import android.util.Xml
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -27,6 +28,7 @@ import org.json.JSONException
 import org.json.JSONObject
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.util.use
+import org.xmlpull.v1.XmlPullParser
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -46,6 +48,8 @@ data class Book(
 	var pendingMetadata: Boolean = false,
 	/** The file's full SHA-256; null for books imported before it was kept. */
 	val sha256: String? = null,
+	/** The authors, comma separated; empty when the book names none, null until read. */
+	var author: String? = null,
 )
 
 /**
@@ -158,8 +162,22 @@ class Library(private val context: Context, private val covers: CoverCache) {
 		}
 		covers.remove(book.id)
 		cleanTitle(publication.metadata.title)?.let { book.title = it }
+		book.author = authorOf(publication)
 		book.pendingMetadata = false
 		save()
+	}
+
+	/**
+	 * Reads the authors of books added before they were kept, from each book's package document
+	 * rather than opening it whole. Returns whether any book changed.
+	 */
+	suspend fun completeAuthors(): Boolean {
+		val missing = books.values.filter { it.author == null && !it.pendingMetadata }
+		if (missing.isEmpty()) return false
+		val found = withContext(Dispatchers.IO) { missing.associate { it.id to readAuthor(file(it.id)) } }
+		found.forEach { (id, author) -> books[id]?.let { if (it.author == null) it.author = author } }
+		save()
+		return true
 	}
 
 	fun touch(id: String) {
@@ -343,7 +361,8 @@ class Library(private val context: Context, private val covers: CoverCache) {
 					.put("lastOpened", book.lastOpened)
 					.put("locator", book.locator)
 					.put("pendingMetadata", book.pendingMetadata)
-					.put("sha256", book.sha256),
+					.put("sha256", book.sha256)
+					.put("author", book.author),
 			)
 		}
 	}.toString()
@@ -371,6 +390,7 @@ class Library(private val context: Context, private val covers: CoverCache) {
 					locator = item.optString("locator").takeIf { it.isNotEmpty() },
 					pendingMetadata = item.optBoolean("pendingMetadata"),
 					sha256 = item.optString("sha256").takeIf { SHA256.matches(it) },
+					author = if (item.has("author")) cleanTitle(item.optString("author")).orEmpty() else null,
 				)
 			} catch (error: JSONException) {
 				continue
@@ -411,5 +431,57 @@ class Library(private val context: Context, private val covers: CoverCache) {
 			val end = if (clean[MAX_TITLE_LENGTH - 1].isHighSurrogate()) MAX_TITLE_LENGTH - 1 else MAX_TITLE_LENGTH
 			return clean.take(end)
 		}
+
+		private fun authorOf(publication: Publication) =
+			cleanTitle(publication.metadata.authors.joinToString(", ") { it.name }).orEmpty()
+
+		/**
+		 * The authors named in the package document: its creators, less those whose role says
+		 * they are not the author (an editor or illustrator). Empty when there are none or the
+		 * file can't be read; books come from anywhere, so nothing here may throw.
+		 */
+		private fun readAuthor(file: File): String = try {
+			ZipFile(file).use { zip ->
+				val container = zip.readSmall(CONTAINER_PATH) ?: return@use ""
+				val packagePath = parse(container) { parser, found ->
+					if (parser.name == "rootfile") parser.getAttributeValue(null, "full-path")?.let(found)
+				}.firstOrNull() ?: return@use ""
+				val document = zip.readSmall(packagePath) ?: return@use ""
+				val creators = parse(document) { parser, found ->
+					if (parser.name == "creator" && parser.namespace == DC_NAMESPACE) {
+						val role = (0 until parser.attributeCount)
+							.firstOrNull { parser.getAttributeName(it) == "role" }
+							?.let(parser::getAttributeValue)
+						val name = parser.nextText()
+						if (role == null || role == "aut") found(name)
+					}
+				}
+				cleanTitle(creators.mapNotNull(::cleanTitle).joinToString(", ")).orEmpty()
+			}
+		} catch (error: Exception) {
+			""
+		}
+
+		private fun ZipFile.readSmall(path: String): ByteArray? {
+			val entry = getEntry(path) ?: return null
+			if (entry.size !in 0..MAX_PACKAGE_BYTES) return null
+			return getInputStream(entry).use { it.readBytes() }
+		}
+
+		/** Calls [onStart] at each element's start; it reports what it finds through its second argument. */
+		private fun parse(bytes: ByteArray, onStart: (XmlPullParser, (String) -> Unit) -> Unit): List<String> {
+			val found = mutableListOf<String>()
+			val parser = Xml.newPullParser()
+			parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true)
+			parser.setInput(bytes.inputStream(), null)
+			while (parser.next() != XmlPullParser.END_DOCUMENT) {
+				if (parser.eventType == XmlPullParser.START_TAG) onStart(parser) { found += it }
+			}
+			return found
+		}
+
+		private const val CONTAINER_PATH = "META-INF/container.xml"
+		private const val DC_NAMESPACE = "http://purl.org/dc/elements/1.1/"
+		private const val MAX_PACKAGE_BYTES = 4L shl 20
 	}
 }

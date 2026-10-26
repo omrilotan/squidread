@@ -89,3 +89,25 @@ const val RESTORE_PLACE_SCRIPT = """
 	requestAnimationFrame(step);
 })();
 """
+
+/**
+ * Turns to the page where [target], a script expression for an element, begins: Readium's own
+ * jumps can stop a page short of it in right-to-left books. The script gives where on the page
+ * the element is, as a fraction of the page's height, or nothing when there is no such element.
+ */
+fun revealScript(target: String) = """
+(function () {
+	var target = $target;
+	if (!target) return null;
+	function first() { return target.getClientRects()[0] || target.getBoundingClientRect(); }
+	// Readium's page width, which may be a fraction of a pixel narrower than innerWidth.
+	var width = window.Android && Android.getViewportWidth ? Android.getViewportWidth() / window.devicePixelRatio : window.innerWidth;
+	var rect = first();
+	var page = Math.floor((rect.left + rect.width / 2 + window.scrollX) / width) * width;
+	if (Math.abs(document.scrollingElement.scrollLeft - page) >= 1) {
+		document.scrollingElement.scrollLeft = page;
+		rect = first();
+	}
+	return (rect.top + rect.bottom) / 2 / window.innerHeight;
+})();
+"""

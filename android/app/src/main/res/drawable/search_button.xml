@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A button inside a search box: a border on its start side only; pressed inverts. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+  <item android:state_pressed="true">
+    <shape><solid android:color="@color/ink" /></shape>
+  </item>
+  <item>
+    <layer-list>
+      <item>
+        <shape><solid android:color="@color/ink" /></shape>
+      </item>
+      <item android:start="2dp">
+        <shape><solid android:color="@color/paper" /></shape>
+      </item>
+    </layer-list>
+  </item>
+</selector>

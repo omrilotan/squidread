@@ -11,8 +11,8 @@ android {
 		minSdk = 24
 		targetSdk = 36
 		// Only ever increases; devices already have test builds up to 5 installed.
-		versionCode = 9
-		versionName = "1.0.0-rc-20261023"
+		versionCode = 10
+		versionName = "1.0.0-rc-20261024"
 	}
 
 	// Readium's page script and styles load into every chapter; stored uncompressed, they are
@@ -74,6 +74,7 @@ dependencies {
 	implementation("androidx.appcompat:appcompat:1.8.0")
 	implementation("androidx.fragment:fragment-ktx:1.9.0")
 	implementation("androidx.recyclerview:recyclerview:1.4.0")
+	implementation("androidx.webkit:webkit:1.17.0")
 	implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
 	// Applies the libraries' baseline profiles on install (including sideloads) for faster startup.
 	implementation("androidx.profileinstaller:profileinstaller:1.4.1")

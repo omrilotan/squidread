@@ -177,6 +177,76 @@
       </ScrollView>
 
       <!--
+        While a search is on: the result shown and a way to the others. It covers the page's edge,
+        so it moves to the top when the match is in the lower part of the page. Kept left to right,
+        like the footer: the previous result is always on the left.
+      -->
+      <LinearLayout
+        android:id="@+id/search_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="4dp"
+        android:background="@drawable/frame_thick"
+        android:layoutDirection="ltr"
+        android:orientation="horizontal"
+        android:padding="2dp"
+        android:visibility="gone">
+
+        <TextView
+          android:id="@+id/search_previous"
+          style="@style/Squidread.Button"
+          android:layout_width="56dp"
+          android:layout_height="44dp"
+          android:minHeight="44dp"
+          android:background="@drawable/search_button_end"
+          android:contentDescription="@string/search_previous"
+          android:paddingStart="0dp"
+          android:paddingEnd="0dp"
+          android:text="@string/previous_symbol"
+          android:textSize="22sp" />
+
+        <TextView
+          android:id="@+id/search_position"
+          style="@style/Squidread.Button"
+          android:layout_width="0dp"
+          android:layout_height="44dp"
+          android:layout_weight="1"
+          android:minHeight="44dp"
+          android:background="@drawable/search_button_plain"
+          android:ellipsize="end"
+          android:maxLines="1"
+          android:textDirection="firstStrong" />
+
+        <TextView
+          android:id="@+id/search_next"
+          style="@style/Squidread.Button"
+          android:layout_width="56dp"
+          android:layout_height="44dp"
+          android:minHeight="44dp"
+          android:background="@drawable/search_button"
+          android:contentDescription="@string/search_next"
+          android:paddingStart="0dp"
+          android:paddingEnd="0dp"
+          android:text="@string/next_symbol"
+          android:textSize="22sp" />
+
+        <TextView
+          android:id="@+id/search_end"
+          style="@style/Squidread.Button"
+          android:layout_width="56dp"
+          android:layout_height="44dp"
+          android:minHeight="44dp"
+          android:background="@drawable/search_button"
+          android:contentDescription="@string/search_end"
+          android:paddingStart="0dp"
+          android:paddingEnd="0dp"
+          android:text="@string/close_symbol" />
+      </LinearLayout>
+
+      <!--
         After the last page: what to do with a finished book. Taps around the buttons work as tap
         zones do, so turning back returns to the last page. "Go to library" sits in the middle,
         where a tap for the menu lands; Delete is kept away from it.
@@ -645,6 +715,74 @@
         android:orientation="vertical"
         android:visibility="gone">
 
+        <!-- Searching the book replaces the contents list with the results until it is cleared. -->
+        <LinearLayout
+          android:id="@+id/search_row"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginStart="16dp"
+          android:layout_marginTop="16dp"
+          android:layout_marginEnd="16dp"
+          android:layout_marginBottom="8dp"
+          android:background="@drawable/frame_thick"
+          android:orientation="horizontal"
+          android:padding="2dp">
+
+          <EditText
+            android:id="@+id/search_field"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:background="@null"
+            android:hint="@string/search_hint"
+            android:importantForAutofill="no"
+            android:imeOptions="actionSearch|flagNoExtractUi"
+            android:inputType="text"
+            android:maxLines="1"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:textColor="@color/ink"
+            android:textColorHint="@color/ink"
+            android:textCursorDrawable="@null"
+            android:textDirection="firstStrong"
+            android:textSize="16sp" />
+
+          <TextView
+            android:id="@+id/search_clear"
+            style="@style/Squidread.Button"
+            android:layout_width="52dp"
+            android:layout_height="44dp"
+            android:minHeight="44dp"
+            android:background="@drawable/search_button"
+            android:contentDescription="@string/search_clear"
+            android:paddingStart="0dp"
+            android:paddingEnd="0dp"
+            android:text="@string/close_symbol"
+            android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+          android:id="@+id/search_status"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:gravity="center"
+          android:paddingStart="32dp"
+          android:paddingTop="8dp"
+          android:paddingEnd="32dp"
+          android:paddingBottom="8dp"
+          android:textColor="@color/ink"
+          android:textSize="15sp"
+          android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+          android:id="@+id/search_list"
+          android:layout_width="match_parent"
+          android:layout_height="0dp"
+          android:layout_weight="1"
+          android:overScrollMode="never"
+          android:scrollbars="none"
+          android:visibility="gone" />
+
         <TextView
           android:id="@+id/toc_empty"
           android:layout_width="match_parent"
@@ -667,16 +805,69 @@
           android:scrollbars="none" />
       </LinearLayout>
 
-      <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/library_list"
-        android:background="@color/paper"
+      <!-- With books in the library, a field above them narrows the list by title or author. -->
+      <LinearLayout
+        android:id="@+id/section_library"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:overScrollMode="never"
-        android:padding="8dp"
-        android:clipToPadding="false"
-        android:scrollbars="none"
-        android:visibility="gone" />
+        android:background="@color/paper"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+          android:id="@+id/library_search_row"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginStart="16dp"
+          android:layout_marginTop="16dp"
+          android:layout_marginEnd="16dp"
+          android:background="@drawable/frame_thick"
+          android:orientation="horizontal"
+          android:padding="2dp">
+
+          <EditText
+            android:id="@+id/library_search_field"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:background="@null"
+            android:hint="@string/library_search_hint"
+            android:importantForAutofill="no"
+            android:imeOptions="actionSearch|flagNoExtractUi"
+            android:inputType="text"
+            android:maxLines="1"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:textColor="@color/ink"
+            android:textColorHint="@color/ink"
+            android:textCursorDrawable="@null"
+            android:textDirection="firstStrong"
+            android:textSize="16sp" />
+
+          <TextView
+            android:id="@+id/library_search_clear"
+            style="@style/Squidread.Button"
+            android:layout_width="52dp"
+            android:layout_height="44dp"
+            android:minHeight="44dp"
+            android:background="@drawable/search_button"
+            android:contentDescription="@string/search_clear"
+            android:paddingStart="0dp"
+            android:paddingEnd="0dp"
+            android:text="@string/close_symbol"
+            android:visibility="gone" />
+        </LinearLayout>
+
+        <androidx.recyclerview.widget.RecyclerView
+          android:id="@+id/library_list"
+          android:layout_width="match_parent"
+          android:layout_height="0dp"
+          android:layout_weight="1"
+          android:overScrollMode="never"
+          android:padding="8dp"
+          android:clipToPadding="false"
+          android:scrollbars="none" />
+      </LinearLayout>
 
       <ScrollView
         android:id="@+id/section_settings"

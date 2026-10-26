@@ -2,6 +2,13 @@
 
 Releases of the Android app. Each entry's notes are what goes into Google Play's "Release notes" (500 characters at most).
 
+## 1.0.0-rc-20261024 (versionCode 10)
+
+- Search the book: find words from Contents, see each match in its sentence, and step between matches on the page.
+- Search the library by title or author.
+- Chapters start on a new page where the book asks for one.
+- Bug fix: in right-to-left books, Contents sometimes opened a chapter on the page before it.
+
 ## 1.0.0-rc-20261023 (versionCode 9)
 
 - Bug fix: Changing the font size or font keeps you on the words you were reading.

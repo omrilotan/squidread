@@ -16,10 +16,13 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import java.text.Normalizer
+import java.util.Locale
 
 /**
  * The books, most recently opened first, then the "Add EPUB" tile. While there are no books, a
  * tile suggesting free books comes before it, and [emptyHint] follows across the whole row.
+ * With a [query], only the books whose title or author has every word of it, or a note that none do.
  */
 class LibraryAdapter(
 	private val library: Library,
@@ -34,13 +37,31 @@ class LibraryAdapter(
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 	private var books: List<Book> = emptyList()
 	private var currentId: String? = null
+	private var filtering = false
+
+	/** Words to find in the title or author, ignoring case and accents. */
+	var query = ""
+		set(value) {
+			field = value
+			refresh(currentId)
+		}
 
 	// The order follows the last opened book and the open book's title is marked, so most tiles
 	// can move or change. With item animations off, one full rebind is a single redraw, which is
 	// what e-ink wants; working out the smallest change would cost more than it saves.
 	@SuppressLint("NotifyDataSetChanged")
 	fun refresh(current: String?) {
-		books = library.all()
+		val all = library.all()
+		val words = fold(query).split(' ').filter { it.isNotEmpty() }
+		filtering = words.isNotEmpty() && all.isNotEmpty()
+		books = if (filtering) {
+			all.filter { book ->
+				val text = fold("${book.title} ${book.author.orEmpty()}")
+				words.all { it in text }
+			}
+		} else {
+			all
+		}
 		currentId = current
 		notifyDataSetChanged()
 	}
@@ -54,9 +75,14 @@ class LibraryAdapter(
 		Unit
 	}
 
-	override fun getItemCount() = if (books.isEmpty()) 3 else books.size + 1
+	override fun getItemCount() = when {
+		filtering -> books.size.coerceAtLeast(1)
+		books.isEmpty() -> 3
+		else -> books.size + 1
+	}
 
 	override fun getItemViewType(position: Int) = when {
+		filtering -> if (books.isEmpty()) TYPE_HINT else TYPE_BOOK
 		books.isNotEmpty() -> if (position < books.size) TYPE_BOOK else TYPE_ADD
 		position == 0 -> TYPE_SUGGESTION
 		position == 1 -> TYPE_ADD
@@ -69,9 +95,7 @@ class LibraryAdapter(
 	override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
 		val inflater = LayoutInflater.from(parent.context)
 		if (viewType == TYPE_HINT) {
-			val hint = inflater.inflate(R.layout.item_library_hint, parent, false) as TextView
-			hint.text = emptyHint
-			return object : RecyclerView.ViewHolder(hint) {}
+			return HintHolder(inflater.inflate(R.layout.item_library_hint, parent, false) as TextView)
 		}
 		if (viewType == TYPE_SUGGESTION) {
 			val view = inflater.inflate(R.layout.item_library_suggestion, parent, false)
@@ -85,10 +109,17 @@ class LibraryAdapter(
 
 	override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
 		when (holder) {
+			is HintHolder -> holder.hint.text = if (filtering) {
+				holder.hint.context.getString(R.string.library_search_none, query.trim())
+			} else {
+				emptyHint
+			}
 			is AddHolder -> holder.bind()
 			is BookHolder -> holder.bind(books[position])
 		}
 	}
+
+	private class HintHolder(val hint: TextView) : RecyclerView.ViewHolder(hint)
 
 	private inner class AddHolder(view: View) : RecyclerView.ViewHolder(view) {
 		fun bind() {
@@ -129,6 +160,15 @@ class LibraryAdapter(
 	}
 
 	private companion object {
+		val MARKS = Regex("\\p{Mn}+")
+		val SPACES = Regex("\\s+")
+
+		/** Lower case, without accents or vowel points, on one line. */
+		fun fold(text: String) = Normalizer.normalize(text, Normalizer.Form.NFD)
+			.replace(MARKS, "")
+			.replace(SPACES, " ")
+			.lowercase(Locale.ROOT)
+
 		const val TYPE_ADD = 0
 		const val TYPE_BOOK = 1
 		const val TYPE_HINT = 2

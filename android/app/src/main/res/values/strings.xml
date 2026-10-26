@@ -34,6 +34,23 @@
   <string name="no_toc">This book has no table of contents.</string>
   <string name="toc_sections">This book has no table of contents. Its sections, in order:</string>
   <string name="toc_section">Section %1$d</string>
+  <string name="search_hint">Search in this book</string>
+  <string name="search_clear">Clear search</string>
+  <string name="search_searching">Searching…</string>
+  <string name="search_none">No results for “%1$s”</string>
+  <string name="search_failed">Could not search this book</string>
+  <string name="search_position">%1$d of %2$d · “%3$s”</string>
+  <string name="search_previous">Previous result</string>
+  <string name="search_next">Next result</string>
+  <string name="search_end">End search</string>
+  <plurals name="search_count">
+    <item quantity="one">%1$d result</item>
+    <item quantity="other">%1$d results</item>
+  </plurals>
+  <plurals name="search_capped">
+    <item quantity="one">The first %1$d result</item>
+    <item quantity="other">The first %1$d results</item>
+  </plurals>
   <string name="zones_heading">Tap zone actions</string>
   <string name="zones_hint">Tap a zone to cycle its action. For right-to-left books, the grid is mirrored.</string>
   <string name="zone_prev">‹ Prev</string>
@@ -54,6 +71,8 @@
   <string name="default_tip_boox">Tip: long press any EPUB, tap “Open with”, tick “Set as default” and choose Squidread.</string>
   <string name="default_tip_android">Tip: open any EPUB, choose Squidread, then tap “Always”.</string>
   <string name="default_how_to">Show me how</string>
+  <string name="library_search_hint">Search titles and authors</string>
+  <string name="library_search_none">No books match “%1$s”</string>
   <string name="library_hint_boox">No books yet. Long press any EPUB, tap “Open with” and choose Squidread, or tap “+ Add EPUB”.</string>
   <string name="library_hint_android">No books yet. Open any EPUB and choose Squidread, or tap “+ Add EPUB”.</string>
   <string name="suggest_books_title">Free books</string>

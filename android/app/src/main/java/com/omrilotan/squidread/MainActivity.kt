@@ -15,12 +15,17 @@ import android.os.Looper
 import android.os.SystemClock
 import android.text.format.DateFormat
 import android.util.Log
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.webkit.WebStorage
 import android.webkit.WebView
+import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -33,6 +38,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.text.HtmlCompat
+import androidx.core.view.LayoutInflaterCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsAnimationControlListenerCompat
@@ -42,6 +48,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.core.view.updatePadding
+import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentFactory
 import androidx.fragment.app.FragmentManager
@@ -63,7 +70,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
+import org.readium.r2.navigator.Decoration
 import org.readium.r2.navigator.HyperlinkNavigator
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
@@ -81,6 +90,8 @@ import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.indexOfFirstWithHref
+import org.readium.r2.shared.publication.services.search.isSearchable
+import org.readium.r2.shared.publication.services.search.search
 import org.readium.r2.shared.util.AbsoluteUrl
 import org.readium.r2.shared.util.use
 import java.util.Date
@@ -127,6 +138,18 @@ class MainActivity : AppCompatActivity() {
 	private lateinit var fontsHowToButton: View
 	private lateinit var tocList: RecyclerView
 	private lateinit var tocEmpty: TextView
+	private lateinit var searchRow: View
+	private lateinit var searchField: EditText
+	private lateinit var searchClear: View
+	private lateinit var searchStatus: TextView
+	private lateinit var searchList: RecyclerView
+	private lateinit var searchBar: View
+	private lateinit var searchPosition: TextView
+	private lateinit var searchPrevious: View
+	private lateinit var searchNext: View
+	private lateinit var librarySearchRow: View
+	private lateinit var librarySearchField: EditText
+	private lateinit var librarySearchClear: View
 	private lateinit var libraryList: RecyclerView
 	private lateinit var sectionViews: Map<Section, View>
 	private lateinit var tabViews: Map<Section, View>
@@ -137,6 +160,7 @@ class MainActivity : AppCompatActivity() {
 	private var isNight = false
 
 	private val tocAdapter = TocAdapter { entry -> navigateTo(entry) }
+	private val searchAdapter = SearchAdapter { index -> showResult(index) }
 	private lateinit var libraryAdapter: LibraryAdapter
 
 	private var book: Book? = null
@@ -156,16 +180,33 @@ class MainActivity : AppCompatActivity() {
 	private var settingsBuilt = false
 	private var coversPreloaded = false
 
+	/** Whether books added before authors were kept have had theirs read; see [Library.completeAuthors]. */
+	private var authorsCompleted = false
+
 	/** Text setting changes, applied one at a time; see [restyle]. */
 	private val restyling = Mutex()
 
 	/** The footer changed while the menu covered it; it is updated when the menu closes. */
 	private var footerStale = false
 
-	/** A Contents jump to another chapter: the menu stays up until the page is ready. */
+	/**
+	 * A jump from Contents or to a search result: waits for Readium's move, corrects it, and
+	 * closes the menu once the page is ready; see [navigateTo] and [showResult].
+	 */
 	private var pendingJump: Job? = null
 	private var sectionTitlesJob: Job? = null
 	private var showsSections = false
+
+	/** The words searched for, while their results replace the contents list; see [search]. */
+	private var searchQuery: String? = null
+	private var searchResults: List<SearchResult> = emptyList()
+	private var searchJob: Job? = null
+
+	/** Pages shown so far, to tell when a move has happened. */
+	private var pageChanges = 0
+
+	/** The result on the page, with the bar for the others; -1 before one is chosen. */
+	private var searchIndex = -1
 
 	/** Where links in the book were followed from; Back returns there. */
 	private val linkHistory = ArrayDeque<Locator>()
@@ -227,6 +268,8 @@ class MainActivity : AppCompatActivity() {
 		// removed at once. The rest of the saved state is kept: it carries the results of the
 		// file and folder pickers when the system recreated the app while they were open.
 		supportFragmentManager.fragmentFactory = EpubNavigatorFragment.createDummyFactory()
+		// Before AppCompat would install its own, which this one stands in for.
+		LayoutInflaterCompat.setFactory2(layoutInflater, BookViewFactory(delegate))
 		super.onCreate(savedInstanceState)
 		supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG)?.let { restored ->
 			supportFragmentManager.commitNow(allowStateLoss = true) { remove(restored) }
@@ -253,6 +296,7 @@ class MainActivity : AppCompatActivity() {
 			when {
 				menu.isVisible -> closeMenu()
 				bookEnd.isVisible -> showEnd(false)
+				searchBar.isVisible -> endSearch()
 				nav != null && linkHistory.isNotEmpty() -> nav.go(linkHistory.removeAt(linkHistory.lastIndex), animated = false)
 				else -> moveTaskToBack(true)
 			}
@@ -510,11 +554,23 @@ class MainActivity : AppCompatActivity() {
 		fontsHowToButton = findViewById(R.id.fonts_how_to)
 		tocList = findViewById(R.id.toc_list)
 		tocEmpty = findViewById(R.id.toc_empty)
+		searchRow = findViewById(R.id.search_row)
+		searchField = findViewById(R.id.search_field)
+		searchClear = findViewById(R.id.search_clear)
+		searchStatus = findViewById(R.id.search_status)
+		searchList = findViewById(R.id.search_list)
+		searchBar = findViewById(R.id.search_bar)
+		searchPosition = findViewById(R.id.search_position)
+		searchPrevious = findViewById(R.id.search_previous)
+		searchNext = findViewById(R.id.search_next)
+		librarySearchRow = findViewById(R.id.library_search_row)
+		librarySearchField = findViewById(R.id.library_search_field)
+		librarySearchClear = findViewById(R.id.library_search_clear)
 		libraryList = findViewById(R.id.library_list)
 		sectionViews = mapOf(
 			Section.STYLES to findViewById(R.id.section_styles),
 			Section.CONTENTS to findViewById(R.id.section_contents),
-			Section.LIBRARY to libraryList,
+			Section.LIBRARY to findViewById(R.id.section_library),
 			Section.SETTINGS to findViewById(R.id.section_settings),
 		)
 		tabViews = mapOf(
@@ -549,12 +605,33 @@ class MainActivity : AppCompatActivity() {
 		tocList.itemAnimator = null
 		tocList.adapter = tocAdapter
 
+		searchList.layoutManager = LinearLayoutManager(this)
+		searchList.itemAnimator = null
+		searchList.adapter = searchAdapter
+		searchField.setOnEditorActionListener { _, actionId, event ->
+			val enter = event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN
+			if (actionId == EditorInfo.IME_ACTION_SEARCH || enter) {
+				search(searchField.text.toString())
+				true
+			} else {
+				false
+			}
+		}
+		searchField.doAfterTextChanged { text -> searchClear.isVisible = !text.isNullOrEmpty() }
+		searchClear.setOnClickListener { endSearch() }
+		searchPrevious.setOnClickListener { showResult(searchIndex - 1) }
+		searchNext.setOnClickListener { showResult(searchIndex + 1) }
+		searchPosition.setOnClickListener { openMenu(Section.CONTENTS) }
+		findViewById<View>(R.id.search_end).setOnClickListener { endSearch() }
+
 		libraryAdapter = LibraryAdapter(
 			library = library,
 			covers = app.covers,
 			scope = lifecycleScope,
 			onAdd = ::pickEpub,
 			onOpen = { selected ->
+				// The next visit to the library starts with every book.
+				if (librarySearchField.text.isNotEmpty()) librarySearchField.text.clear()
 				if (selected.id == taskBookId) {
 					if (book == null && openJob?.isActive != true) openBook(selected) else closeMenu()
 				} else {
@@ -574,6 +651,34 @@ class MainActivity : AppCompatActivity() {
 		}
 		libraryList.itemAnimator = null
 		libraryList.adapter = libraryAdapter
+
+		librarySearchField.setOnEditorActionListener { _, actionId, event ->
+			val enter = event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN
+			if (actionId == EditorInfo.IME_ACTION_SEARCH || enter) {
+				hideKeyboard()
+				true
+			} else {
+				false
+			}
+		}
+		librarySearchField.doAfterTextChanged { text ->
+			librarySearchClear.isVisible = !text.isNullOrEmpty()
+			libraryAdapter.query = text?.toString().orEmpty()
+			libraryList.scrollToPosition(0)
+		}
+		librarySearchClear.setOnClickListener { librarySearchField.text.clear() }
+	}
+
+	/** The library, with its search field while there are books to search. */
+	private fun refreshLibrary() {
+		librarySearchRow.isVisible = library.all().isNotEmpty()
+		libraryAdapter.refresh(book?.id)
+		if (!authorsCompleted) {
+			authorsCompleted = true
+			lifecycleScope.launch {
+				if (library.completeAuthors() && libraryAdapter.query.isNotBlank()) libraryAdapter.refresh(book?.id)
+			}
+		}
 	}
 
 	private fun libraryColumns() = (resources.configuration.screenWidthDp / LIBRARY_COLUMN_DP).coerceIn(2, 6)
@@ -888,6 +993,7 @@ class MainActivity : AppCompatActivity() {
 			return
 		}
 		tocList.layoutDirection = if (isRtl()) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+		searchList.layoutDirection = tocList.layoutDirection
 		scheduleTrim()
 	}
 
@@ -905,7 +1011,10 @@ class MainActivity : AppCompatActivity() {
 		// Books share one web address, so what a book's script stored must not reach the next
 		// book; another book open in a different task loses its stored data too.
 		WebStorage.getInstance().deleteAllData()
-		val configuration = EpubNavigatorFragment.Configuration(shouldApplyInsetsPadding = false)
+		val configuration = EpubNavigatorFragment.Configuration(
+			shouldApplyInsetsPadding = false,
+			decorationTemplates = decorationTemplates(),
+		)
 		val families = fonts.families
 		fonts.declare(configuration, families)
 		declaredFamilies = families.map { it.family }.toSet()
@@ -938,6 +1047,8 @@ class MainActivity : AppCompatActivity() {
 		locatorJob = lifecycleScope.launch {
 			fragment.currentLocator.collect { locator -> onLocatorChanged(locator) }
 		}
+		// A rebuilt navigator, for a new font, still shows the search result.
+		searchResults.getOrNull(searchIndex)?.let(::markResult)
 	}
 
 	private fun closeBook() {
@@ -960,6 +1071,7 @@ class MainActivity : AppCompatActivity() {
 		sectionTitlesJob?.cancel()
 		sectionTitlesJob = null
 		showsSections = false
+		resetSearch()
 		publication?.close()
 		publication = null
 		book = null
@@ -991,7 +1103,7 @@ class MainActivity : AppCompatActivity() {
 				} else {
 					BookTasks.remove(this, selected.id)
 				}
-				libraryAdapter.refresh(book?.id)
+				refreshLibrary()
 			}
 			.setNegativeButton(R.string.cancel, null)
 			.show()
@@ -1039,6 +1151,7 @@ class MainActivity : AppCompatActivity() {
 		}
 
 		override fun onPageChanged(pageIndex: Int, totalPages: Int, locator: Locator) {
+			pageChanges++
 			// Only reported once the current page is in place.
 			if (awaitingFirstPage) onFirstPageShown()
 			// Readium counts columns from the left; right-to-left books start on the rightmost one.
@@ -1049,7 +1162,7 @@ class MainActivity : AppCompatActivity() {
 			// Moved away from the end, by the contents or a new layout: the page itself shows.
 			if (!onLastPage) showEnd(false)
 			updateFooter()
-			if (pendingJump != null) closeMenu()
+			if (searchBar.isVisible && pendingJump?.isActive != true) placeSearchBar()
 			preRasterWebViews(navigator?.view)
 		}
 	}
@@ -1163,14 +1276,14 @@ class MainActivity : AppCompatActivity() {
 		val nav = navigator ?: return closeMenu()
 		val opened = publication ?: return closeMenu()
 		val here = currentLocator?.href?.removeFragment()?.toString()
+		val before = pageChanges
 		val moved = nav.go(entry.link, animated = false)
 		// Readium pages only through the reading order; non-linear items and broken links go nowhere.
 		val pages = moved && opened.readingOrder.indexOfFirstWithHref(entry.link.url()) != null
 		val sameChapter = here == entry.path
+		val anchor = entry.link.url().fragment
 		// Only a jump to the start of the loaded chapter is applied at once.
-		if (!pages || here == null || opened.metadata.layout == Layout.FIXED ||
-			(sameChapter && entry.link.url().fragment == null)
-		) {
+		if (!pages || here == null || opened.metadata.layout == Layout.FIXED || (sameChapter && anchor == null)) {
 			closeMenu()
 			return
 		}
@@ -1180,7 +1293,18 @@ class MainActivity : AppCompatActivity() {
 		if (!sameChapter) tocAdapter.setActive(entry)
 		pendingJump?.cancel()
 		pendingJump = lifecycleScope.launch {
-			delay(if (sameChapter) SAME_CHAPTER_JUMP_TIMEOUT_MS else JUMP_TIMEOUT_MS)
+			// A move to the same page shows no new page.
+			withTimeoutOrNull(if (sameChapter) SAME_CHAPTER_JUMP_TIMEOUT_MS else JUMP_TIMEOUT_MS) {
+				while (pageChanges == before) delay(MATCH_LOOKUP_MS)
+			}
+			// Readium can stop a page short of an anchor; turn on to it, still under the menu.
+			if (anchor != null) {
+				val script = revealScript("document.getElementById(${JSONObject.quote(anchor)})")
+				for (attempt in 1..MATCH_LOOKUPS) {
+					if (runCatching { nav.evaluateJavascript(script) }.getOrNull()?.toDoubleOrNull() != null) break
+					delay(MATCH_LOOKUP_MS)
+				}
+			}
 			closeMenu()
 		}
 	}
@@ -1337,9 +1461,8 @@ class MainActivity : AppCompatActivity() {
 	}
 
 	private fun closeMenu() {
-		pendingJump?.cancel()
-		pendingJump = null
 		if (!menu.isVisible) return
+		hideKeyboard()
 		menu.isVisible = false
 		barScrims.forEach { it.isVisible = false }
 		setSystemBarsVisible(false)
@@ -1408,23 +1531,197 @@ class MainActivity : AppCompatActivity() {
 	}
 
 	private fun showSection(target: Section) {
+		if (target != section) hideKeyboard()
 		section = target
 		sectionViews.forEach { (key, view) -> view.isVisible = key == target }
 		tabViews.forEach { (key, view) -> view.isSelected = key == target }
 		when (target) {
-			Section.LIBRARY -> libraryAdapter.refresh(book?.id)
-			Section.CONTENTS -> {
-				val empty = tocAdapter.itemCount == 0
-				tocEmpty.isVisible = empty || showsSections
-				when {
-					empty -> tocEmpty.setText(if (navigator == null) R.string.no_contents else R.string.no_toc)
-					showsSections -> tocEmpty.setText(R.string.toc_sections)
-				}
-				tocAdapter.activeIndex.takeIf { it >= 0 }?.let { tocList.scrollToPosition(it) }
-			}
+			Section.LIBRARY -> refreshLibrary()
+			Section.CONTENTS -> showContents()
 			Section.STYLES -> refreshFonts()
 			Section.SETTINGS -> setUpSettings()
 		}
+	}
+
+	/** The contents list, or a search's results in its place. */
+	private fun showContents() {
+		searchRow.isVisible = publication?.isSearchable == true
+		val searching = searchQuery != null
+		searchStatus.isVisible = searching
+		searchList.isVisible = searching && searchResults.isNotEmpty()
+		tocList.isVisible = !searching
+		if (searching) {
+			tocEmpty.isVisible = false
+			searchIndex.takeIf { it >= 0 }?.let { searchList.scrollToPosition(it) }
+			return
+		}
+		val empty = tocAdapter.itemCount == 0
+		tocEmpty.isVisible = empty || showsSections
+		when {
+			empty -> tocEmpty.setText(if (navigator == null) R.string.no_contents else R.string.no_toc)
+			showsSections -> tocEmpty.setText(R.string.toc_sections)
+		}
+		tocAdapter.activeIndex.takeIf { it >= 0 }?.let { tocList.scrollToPosition(it) }
+	}
+
+	// --- Search ----------------------------------------------------------------
+
+	/** Finds [text] in the whole book, in the background, and lists where it is. */
+	private fun search(text: String) {
+		val query = text.trim().replace(WHITESPACE, " ")
+		if (query.isEmpty()) return endSearch()
+		val opened = publication ?: return
+		hideKeyboard()
+		clearResult()
+		searchJob?.cancel()
+		searchQuery = query
+		searchResults = emptyList()
+		searchAdapter.submit(emptyList())
+		searchStatus.setText(R.string.search_searching)
+		showContents()
+		searchJob = lifecycleScope.launch {
+			var failed = false
+			val found = withContext(Dispatchers.IO) {
+				val results = mutableListOf<Locator>()
+				val iterator = runCatching { opened.search(query) }.getOrNull()
+				if (iterator == null) {
+					failed = true
+					return@withContext results
+				}
+				try {
+					while (results.size < MAX_SEARCH_RESULTS) {
+						val next = iterator.next()
+						if (next.isFailure) {
+							failed = true
+							break
+						}
+						val page = next.getOrNull() ?: break
+						results += page.locators
+					}
+				} finally {
+					iterator.close()
+				}
+				results.take(MAX_SEARCH_RESULTS)
+			}
+			if (publication !== opened) return@launch
+			searchResults = found.map { locator -> SearchResult(locator, tocAdapter.entryFor(locator)?.title) }
+			// The footer's chapter lookup was borrowed; put it back.
+			currentLocator?.let { tocAdapter.entryFor(it) }
+			searchAdapter.submit(searchResults)
+			searchStatus.text = when {
+				found.isEmpty() && failed -> getString(R.string.search_failed)
+				found.isEmpty() -> getString(R.string.search_none, query)
+				found.size >= MAX_SEARCH_RESULTS -> resources.getQuantityString(R.plurals.search_capped, MAX_SEARCH_RESULTS, MAX_SEARCH_RESULTS)
+				else -> resources.getQuantityString(R.plurals.search_count, found.size, found.size)
+			}
+			showContents()
+			searchList.scrollToPosition(0)
+		}
+	}
+
+	/**
+	 * Turns to a result and marks it there; the bar offers the others. Readium can land a page
+	 * short of the match, so once it has moved the page is corrected, still under the menu when
+	 * the result was chosen from the list, which closes then.
+	 */
+	private fun showResult(index: Int) {
+		val result = searchResults.getOrNull(index) ?: return
+		val nav = navigator ?: return
+		// A jump to a result starts a new trail; Back no longer returns to old links.
+		linkHistory.clear()
+		showEnd(false)
+		val here = currentLocator?.href?.removeFragment()
+		val sameChapter = here != null && here.isEquivalent(result.locator.href.removeFragment())
+		searchIndex = index
+		val before = pageChanges
+		pendingJump?.cancel()
+		pendingJump = null
+		nav.go(result.locator, animated = false)
+		markResult(result)
+		updateSearchBar()
+		pendingJump = lifecycleScope.launch {
+			// A move to the same page shows no new page.
+			withTimeoutOrNull(if (sameChapter) SAME_CHAPTER_JUMP_TIMEOUT_MS else JUMP_TIMEOUT_MS) {
+				while (pageChanges == before) delay(MATCH_LOOKUP_MS)
+			}
+			repeat(MATCH_LOOKUPS) {
+				val position = runCatching { nav.evaluateJavascript(REVEAL_MATCH_SCRIPT) }.getOrNull()?.toDoubleOrNull()
+				if (position != null) {
+					placeSearchBar(position)
+					closeMenu()
+					return@launch
+				}
+				delay(MATCH_LOOKUP_MS)
+			}
+			closeMenu()
+		}
+	}
+
+	private fun markResult(result: SearchResult) {
+		val nav = navigator ?: return
+		lifecycleScope.launch {
+			nav.applyDecorations(listOf(Decoration(SEARCH_MATCH_ID, result.locator, SearchMatch())), SEARCH_GROUP)
+		}
+	}
+
+	private fun clearResult() {
+		searchIndex = -1
+		searchBar.isVisible = false
+		val nav = navigator ?: return
+		lifecycleScope.launch { nav.applyDecorations(emptyList(), SEARCH_GROUP) }
+	}
+
+	private fun updateSearchBar() {
+		val query = searchQuery ?: return
+		searchPosition.setTextIfChanged(getString(R.string.search_position, searchIndex + 1, searchResults.size, query))
+		searchPrevious.isEnabled = searchIndex > 0
+		searchNext.isEnabled = searchIndex < searchResults.lastIndex
+		searchBar.isVisible = true
+	}
+
+	/** Looks for the match on the page showing, a few times, as it is drawn a moment after the page. */
+	private fun placeSearchBar() {
+		val nav = navigator ?: return
+		val index = searchIndex
+		lifecycleScope.launch {
+			repeat(MATCH_LOOKUPS) {
+				val position = runCatching { nav.evaluateJavascript(MATCH_POSITION_SCRIPT) }.getOrNull()?.toDoubleOrNull()
+				if (searchIndex != index || navigator !== nav) return@launch
+				if (position != null) return@launch placeSearchBar(position)
+				delay(MATCH_LOOKUP_MS)
+			}
+		}
+	}
+
+	/** Moves the bar to the top of the page when the match is low on it, where the bar would cover it. */
+	private fun placeSearchBar(position: Double) {
+		val gravity = if (position > LOW_MATCH) Gravity.TOP else Gravity.BOTTOM
+		searchBar.updateLayoutParams<FrameLayout.LayoutParams> {
+			if (this.gravity != gravity) this.gravity = gravity
+		}
+	}
+
+	/** Back to the contents list, and to reading without a mark on the page. */
+	private fun endSearch() {
+		hideKeyboard()
+		resetSearch()
+		if (menu.isVisible && section == Section.CONTENTS) showContents()
+	}
+
+	private fun resetSearch() {
+		searchJob?.cancel()
+		searchJob = null
+		clearResult()
+		searchQuery = null
+		searchResults = emptyList()
+		searchAdapter.submit(emptyList())
+		if (searchField.text.isNotEmpty()) searchField.text.clear()
+	}
+
+	private fun hideKeyboard() {
+		val field = listOf(searchField, librarySearchField).firstOrNull { it.hasFocus() } ?: return
+		field.clearFocus()
+		getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(field.windowToken, 0)
 	}
 
 	private fun changeFontSize(delta: Double) = setFontSize(prefs.fontSize + delta)
@@ -1599,6 +1896,14 @@ class MainActivity : AppCompatActivity() {
 		const val COVER_PRELOAD_DELAY_MS = 2_000L
 		const val JUMP_TIMEOUT_MS = 3_000L
 		const val SAME_CHAPTER_JUMP_TIMEOUT_MS = 500L
+		/** Enough for any real search; a word as common as "the" stops here. */
+		const val MAX_SEARCH_RESULTS = 500
+		const val SEARCH_GROUP = "search"
+		const val SEARCH_MATCH_ID = "match"
+		/** A match lower than this share of the page would be under the search bar. */
+		const val LOW_MATCH = 0.8
+		const val MATCH_LOOKUPS = 10
+		const val MATCH_LOOKUP_MS = 100L
 		/** Where a section's first heading is looked for: its opening bytes. */
 		const val SECTION_HEADING_BYTES = 16_384L
 		const val KEY_REPEAT_MS = 250L
@@ -1613,6 +1918,7 @@ class MainActivity : AppCompatActivity() {
 		const val LIBRARY_COLUMN_DP = 140
 		const val LIBRARY_TITLE_DP = 48
 		val EXTERNAL_SCHEMES = setOf("http", "https", "mailto")
+		val WHITESPACE = Regex("\\s+")
 		val EPUB_MIME_TYPES = arrayOf("application/epub+zip", "application/octet-stream", "application/zip")
 
 		/** Boox devices are made by Onyx; their library sets the default reader its own way. */
