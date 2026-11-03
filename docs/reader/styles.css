@@ -284,6 +284,19 @@ button:disabled:active {
 
 /* --- Contents ---------------------------------------------------------------- */
 
+/* The search field stays put; the list under it scrolls. */
+#contentsSection,
+#librarySection {
+  overflow: hidden;
+}
+
+#contentsSection > ul,
+#librarySection > ul {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .tocList {
   list-style: none;
   margin: 0 calc(-1 * var(--gap));
@@ -310,6 +323,100 @@ button:disabled:active {
   color: var(--paper);
 }
 
+/* --- Search: the book's, in Contents, and the library's ----------------------- */
+
+/* A field in a heavy frame, with a button to clear it once there is something to clear. */
+.searchRow {
+  display: flex;
+  flex: none;
+  margin-top: var(--gap);
+  border: var(--line) solid var(--ink);
+}
+
+.searchRow input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 16px;
+}
+
+/* The frame is the field's; the caret shows where typing goes. */
+.searchRow input:focus-visible {
+  outline: none;
+}
+
+.searchRow input::placeholder {
+  color: var(--ink);
+  opacity: 1;
+}
+
+.searchRow button {
+  width: 52px;
+  min-height: 44px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-inline-start: var(--line) solid var(--ink);
+  font-size: 20px;
+}
+
+.searchStatus {
+  margin: 0;
+  padding: 8px 16px;
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.searchList {
+  list-style: none;
+  margin: 0 calc(-1 * var(--gap));
+  padding: 0;
+}
+
+/* A result: its chapter, then the match with the text around it, the match inverted. */
+.searchItem {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px var(--gap);
+  border: 0;
+  border-bottom: 1px solid var(--ink);
+  text-align: start;
+  line-height: 1.35;
+}
+
+.searchChapter {
+  display: block;
+  padding-bottom: 2px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.searchText {
+  display: block;
+}
+
+.searchText mark {
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 700;
+}
+
+.searchItem:active mark,
+.searchItem.active mark {
+  background: var(--paper);
+  color: var(--ink);
+}
+
 /* --- Library ----------------------------------------------------------------- */
 
 .library {
@@ -320,6 +427,7 @@ button:disabled:active {
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: var(--gap);
   align-items: start;
+  align-content: start;
 }
 
 .libraryAddItem,
@@ -361,12 +469,50 @@ button:disabled:active {
 }
 
 .bookTitle {
-  font-weight: 700;
   line-height: 1.3;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+}
+
+/* The open book is marked with a heavier title rather than a grey tint. */
+.libraryItem.current .bookTitle {
+  font-weight: 700;
+}
+
+/* While the library is empty: where free books can be found. */
+.librarySuggestion {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  aspect-ratio: 2 / 3;
+  padding: 12px;
+  border: var(--line) solid var(--ink);
+  line-height: 1.3;
+}
+
+.librarySuggestion h3 {
+  margin: 0;
+  font-size: inherit;
+}
+
+.librarySuggestion p {
+  flex: 1;
+  margin: 0;
+}
+
+.librarySuggestion .linkButton {
+  min-height: 40px;
+}
+
+/* A note across the whole row: why the library is empty, or why nothing matches. */
+.libraryHint {
+  grid-column: 1 / -1;
+  margin: 0;
+  text-align: center;
+  line-height: 1.4;
 }
 
 /* Sits on the tile's corner, sharing its border. */
@@ -456,25 +602,199 @@ button:disabled:active {
   max-width: 100% !important;
 }
 
-.viewerEmptyState {
+/* Over the page's edge while a search is on; at the top when the match is low on the page. */
+.searchBar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--footer-height) + 4px);
+  display: flex;
+  border: var(--line) solid var(--ink);
+  background: var(--paper);
+  z-index: 4;
+}
+
+.searchBar.top {
+  top: 4px;
+  bottom: auto;
+}
+
+.searchBar button {
+  min-height: 44px;
+  border: 0;
+  padding: 0;
+}
+
+.searchBar button + button {
+  border-inline-start: var(--line) solid var(--ink);
+}
+
+.searchBar #searchPrevious,
+.searchBar #searchNext,
+.searchBar #searchEnd {
+  width: 56px;
+  flex: none;
+  font-size: 22px;
+}
+
+.searchBar #searchEnd {
+  font-size: 20px;
+}
+
+/* At either end of the results: drawn the same, it just doesn't press. */
+.searchBar button:disabled {
+  border: 0;
+}
+
+.searchBar button + button:disabled {
+  border-inline-start: var(--line) solid var(--ink);
+}
+
+.searchPosition {
+  flex: 1;
+  min-width: 0;
+  padding: 0 8px !important;
+}
+
+.searchPosition span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* After the last page. "Go to library" stays in the middle, between two equal halves. */
+.bookEnd {
   position: absolute;
   inset: 0 0 var(--footer-height);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: var(--gap);
-  pointer-events: none;
+  padding: 0 24px;
+  background: var(--paper);
+  text-align: center;
+  z-index: 3;
+}
+
+.bookEndHalf {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.bookEndTop {
+  justify-content: flex-end;
+}
+
+.bookEnd h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.bookEndTitle {
+  margin: 8px 0 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.bookEnd button {
+  min-width: 240px;
+}
+
+#bookEndRestart {
+  margin: 24px 0 12px;
+}
+
+#bookEndDelete {
+  margin-top: 12px;
+}
+
+#bookEndClose {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 48px;
+  min-width: 0;
+  height: 48px;
+  min-height: 0;
+  font-size: 20px;
+}
+
+/*
+ * Where the page can't mark text itself, epub.js draws the search match as a white box in a
+ * layer over the page; blended by difference, it inverts the match in either theme.
+ */
+.viewer .epub-view > svg {
+  mix-blend-mode: difference;
+}
+
+.viewerEmptyState {
+  position: absolute;
+  inset: 0 0 var(--footer-height);
+  display: flex;
+  padding: 24px;
+  overflow-y: auto;
+  text-align: center;
   z-index: 2;
 }
 
+/* Centred while it fits, and scrolled from the top once it doesn't. */
+.viewerEmptyContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gap);
+  margin: auto;
+}
+
 .viewerEmptyLogo {
+  flex: none;
   border-radius: 50%;
   background: #fff;
 }
 
-.viewerEmptyText {
-  font-size: 18px;
+.viewerEmptyTitle {
+  margin: 0;
+  font-size: 20px;
+}
+
+#selectBookBtn,
+#introAddBtn {
+  min-width: 240px;
+}
+
+.readerIntro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 420px;
+  line-height: 1.4;
+}
+
+.readerIntro p {
+  margin: 0 0 12px;
+}
+
+.readerIntro button {
+  margin-bottom: 24px;
+}
+
+.readerIntro .segmented {
+  width: 100%;
+  max-width: 300px;
+}
+
+.readerIntro .segmented > .linkButton {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.readerIntro .segmented > .linkButton + .linkButton {
+  margin: 0 0 0 calc(-1 * var(--line));
 }
 
 .readerFooter {
@@ -583,9 +903,9 @@ button:disabled:active {
   margin-top: 8px;
 }
 
-/* --- Install dialog ---------------------------------------------------------- */
+/* --- Dialogs: installing, deleting a book, a footnote --------------------------- */
 
-.installModal {
+.dialog {
   position: fixed;
   inset: 0;
   display: none;
@@ -603,24 +923,26 @@ button:disabled:active {
   z-index: 1000;
 }
 
-.installModal::backdrop {
+.dialog::backdrop {
   background: transparent;
 }
 
-.installModal[open] {
+.dialog[open] {
   display: flex;
 }
 
-.installModalContent {
+.dialogContent {
   position: relative;
   width: 100%;
   max-width: 400px;
+  max-height: 100%;
+  overflow-y: auto;
   padding: 24px var(--gap) var(--gap);
   border: var(--line) solid var(--ink);
   background: var(--paper);
 }
 
-.installModalClose {
+.dialogClose {
   position: absolute;
   top: calc(-1 * var(--line));
   right: calc(-1 * var(--line));
@@ -631,18 +953,29 @@ button:disabled:active {
   font-size: 20px;
 }
 
-.installModalBody h2 {
+.dialogContent h2 {
   margin: 0 0 12px;
   font-size: 20px;
 }
 
-.installModalBody p {
+.dialogContent p {
   margin: 0 0 24px;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
-.installModalButtons {
+/* The first button is the one that acts, on the right. */
+.dialogButtons {
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: row-reverse;
   gap: 8px;
+}
+
+.dialogButtons > button {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.noteText {
+  font-size: 18px;
 }

@@ -20,6 +20,26 @@ const progressPercentEl = document.getElementById('progressPercent');
 const menuTitleEl = document.getElementById('menuTitle');
 const librarySectionEl = document.getElementById('librarySection');
 const viewerEmptyStateEl = document.getElementById('viewerEmptyState');
+const viewerEmptyTitleEl = document.getElementById('viewerEmptyTitle');
+const selectBookBtn = document.getElementById('selectBookBtn');
+const readerIntroEl = document.getElementById('readerIntro');
+const readerIntroZonesEl = document.getElementById('readerIntroZones');
+const searchRowEl = document.getElementById('searchRow');
+const searchFieldEl = document.getElementById('searchField');
+const searchClearEl = document.getElementById('searchClear');
+const searchStatusEl = document.getElementById('searchStatus');
+const searchListEl = document.getElementById('searchList');
+const searchBarEl = document.getElementById('searchBar');
+const searchPositionEl = document.getElementById('searchPosition');
+const searchPreviousEl = document.getElementById('searchPrevious');
+const searchNextEl = document.getElementById('searchNext');
+const librarySearchRowEl = document.getElementById('librarySearchRow');
+const librarySearchFieldEl = document.getElementById('librarySearchField');
+const librarySearchClearEl = document.getElementById('librarySearchClear');
+const bookEndEl = document.getElementById('bookEnd');
+const bookEndTitleEl = document.getElementById('bookEndTitle');
+const deleteDialogEl = document.getElementById('deleteDialog');
+const noteDialogEl = document.getElementById('noteDialog');
 
 const wait = (ms) => new Promise((res) => setTimeout(res, ms));
 
@@ -38,6 +58,20 @@ const EPUB_SCRIPTS = [
 ];
 let epubDepsPromise = null;
 const MAX_BOOK_BYTES = 500 * 1024 * 1024;
+const MAX_PACKAGE_BYTES = 4 * 1024 * 1024;
+const MAX_TITLE_LENGTH = 500;
+const MAX_TOC_DEPTH = 32;
+const MAX_INDENT_DEPTH = 6;
+const DC_NAMESPACE = 'http://purl.org/dc/elements/1.1/';
+const OPS_NAMESPACE = 'http://www.idpf.org/2007/ops';
+// The book can make a note anything; a note is never this long.
+const MAX_NOTE_LENGTH = 16 * 1024;
+const MARKS = /\p{Mn}+/gu;
+const GUTENBERG_EXAMPLE_URL = 'https://www.gutenberg.org/ebooks/345.epub3.images';
+const GUTENBERG_URL = 'https://www.gutenberg.org/ebooks/search/?sort_order=downloads';
+const NAVIGATION_WAIT_MS = 2000;
+// Books in these languages read right to left when they don't say which way they go.
+const RTL_LANGUAGES = new Set(['ar', 'fa', 'he']);
 
 function loadScript({ src, integrity }) {
   return new Promise((resolve, reject) => {
@@ -124,6 +158,22 @@ let currentFontSize = 1.0; // Track font size multiplier from default (1em = 100
 let isTurningPage = false;
 let resizeTimer = null;
 let lastClockUpdate = 0;
+// The contents list, flat, as numbered in the footer; sections stand in for a missing one.
+let tocEntries = [];
+let showsSections = false;
+// Where links were followed from, so Back returns there; see followLink.
+const linkHistory = [];
+const MAX_LINK_HISTORY = 20;
+let ignoredPops = 0;
+// Where the reader was when the font size last changed, kept until the page is turned.
+let keptPlace = null;
+let placeTimer = null;
+const KEEP_PLACE_MS = 150;
+const KEEP_PLACE_TRIES = 3;
+let touchStart = null;
+let lastSwipeAt = 0;
+const SWIPE_DISTANCE = 40;
+const SWIPE_CLICK_MS = 500;
 const READER_ASPECT_PRESETS = {
   fullscreen: null,
   '16:9': 16 / 9,
@@ -294,7 +344,8 @@ function wireReaderAspectControls() {
   if (savedFontSize > 0) currentFontSize = savedFontSize;
   applyFontSize();
   await renderLibrary();
-  
+  await refreshEmptyState();
+
   // Load the last opened book if available
   const lastOpenedBookId = localStorage.getItem('lastOpenedBookId');
   try {
@@ -315,10 +366,8 @@ function wireReaderAspectControls() {
         log.info('Loading most recent book:', books[0].id);
         await loadBook(books[0].id);
       } else {
+        // The empty reader says what it's for and where books come from.
         log.info('No books in library');
-        // No books available, open menu on Library tab
-        switchPanelSection('library');
-        panelEl.classList.remove('hidden');
       }
     }
   } catch (error) {
@@ -349,10 +398,13 @@ function wireEvents() {
   const handleViewerPointer = (event) => {
     const target = event.target;
     if (!isDomElement(target)) return;
-    if (typeof target.closest === 'function' && target.closest('a[href], .readerFooter')) return;
+    // The reader's own controls act for themselves; taps around them work as tap zones.
+    if (typeof target.closest === 'function' && target.closest('a[href], button, .readerFooter, .searchBar')) return;
     handleViewerZoneClick(event.clientX, event.clientY);
   };
   readerEl?.addEventListener('click', handleViewerPointer, true);
+  readerEl?.addEventListener('touchstart', handleTouchStart, { passive: true });
+  readerEl?.addEventListener('touchend', handleTouchEnd);
   closePanelBtn.addEventListener('click', () => closePanel());
   swRefreshLink?.addEventListener('click', async (event) => {
     event.preventDefault();
@@ -371,11 +423,15 @@ function wireEvents() {
   document.getElementById('fontSizeReset')?.addEventListener('click', () => resetFontSize());
   document.getElementById('fontSizeIncrease')?.addEventListener('click', () => adjustFontSize(0.1));
 
-  // Wire up the Add EPUB button to open file picker
-  const addEpubBtn = document.getElementById('addEpubBtn');
-  addEpubBtn?.addEventListener('click', () => {
-    filePicker.click();
-  });
+  // Wire up the Add EPUB buttons to open file picker
+  document.getElementById('addEpubBtn')?.addEventListener('click', () => filePicker.click());
+  document.getElementById('introAddBtn')?.addEventListener('click', () => filePicker.click());
+  selectBookBtn?.addEventListener('click', () => openPanel('library'));
+
+  wireSearchEvents();
+  wireBookEndEvents();
+  document.getElementById('noteClose')?.addEventListener('click', () => noteDialogEl.close());
+  document.getElementById('deleteCancel')?.addEventListener('click', () => deleteDialogEl.close());
 
   // Auto-start when a file is selected
   filePicker.addEventListener('change', async () => {
@@ -417,6 +473,8 @@ function wireEvents() {
 
     if (actionElement.matches('[data-action="open"]')) {
       log.info('Open action clicked for book ID:', id);
+      // The next visit to the library starts with every book.
+      setLibraryQuery('');
       if (currentRecord?.id === id) {
         closePanel();
       } else {
@@ -425,11 +483,7 @@ function wireEvents() {
     }
 
     if (actionElement.matches('[data-action="delete"]')) {
-      await db.delete('books', id);
-      if (currentRecord?.id === id) {
-        clearViewer();
-      }
-      await renderLibrary();
+      await confirmDelete(id);
     }
   });
 
@@ -440,6 +494,10 @@ function wireEvents() {
     if (!button) return;
     const href = button.dataset.href;
     if (!href || !rendition) return;
+    // A jump from the contents starts a new trail; Back no longer returns to old links.
+    clearLinkHistory();
+    showEnd(false);
+    keptPlace = null;
     try {
       await rendition.display(href);
       closePanel();
@@ -478,6 +536,19 @@ function wireEvents() {
 
   window.addEventListener('keydown', (event) => {
     handleReaderKeydown(event);
+  });
+
+  // Back, in the browser or on the device, returns to where a link was followed from.
+  window.addEventListener('popstate', () => {
+    if (ignoredPops > 0) {
+      ignoredPops--;
+      return;
+    }
+    const origin = linkHistory.pop();
+    if (origin && rendition) {
+      showEnd(false);
+      rendition.display(origin).catch((error) => log.warn('Failed to go back:', error));
+    }
   });
 
   // Setup install modal handlers
@@ -553,6 +624,7 @@ function wireZoneGridEvents() {
       zoneActionMap[key] = ZONE_ACTIONS[(current + 1) % ZONE_ACTIONS.length];
       saveZoneMapToStorage();
       updateCell(cell);
+      refreshEmptyState();
     });
   });
 }
@@ -578,12 +650,13 @@ function applyThemeMode(mode) {
   applyBookTheme();
 }
 
-/** The book's pages take the theme's two colours too. */
+/** The book's pages take the theme's two colours too, and so does a search match on them. */
 function applyBookTheme() {
   if (!rendition) return;
   const styles = getComputedStyle(document.documentElement);
   rendition.themes.override('color', styles.getPropertyValue('--ink').trim(), true);
   rendition.themes.override('background', styles.getPropertyValue('--paper').trim(), true);
+  rendition.getContents().forEach(markContents);
 }
 
 function wireThemeControls() {
@@ -600,6 +673,636 @@ function wireThemeControls() {
   });
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applyBookTheme());
   applyThemeMode(getThemeMode());
+}
+
+// --- Search ------------------------------------------------------------------
+
+// The words searched for, while their results replace the contents list; see searchBook.
+let searchQuery = null;
+let searchResults = [];
+let searchIndex = -1;
+// A new search, or a new book, stops the one before.
+let searchRun = 0;
+// Enough for any real search; a word as common as "the" stops here.
+const MAX_SEARCH_RESULTS = 500;
+// A match lower than this share of the page would be under the search bar.
+const LOW_MATCH = 0.8;
+const MATCH_HIGHLIGHT = 'squidread-match';
+// Elements that start a new line of text, so words either side of them don't run together.
+const TEXT_BREAKS = new Set(['address', 'article', 'aside', 'blockquote', 'br', 'dd', 'div', 'dl', 'dt', 'figcaption', 'figure', 'footer', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'li', 'nav', 'ol', 'p', 'pre', 'section', 'table', 'td', 'th', 'tr', 'ul']);
+const UNREAD = new Set(['script', 'style', 'noscript', 'template']);
+const SNIPPET_BEFORE = 50;
+const SNIPPET_AFTER = 80;
+
+function wireSearchEvents() {
+  searchFieldEl.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    searchBook(searchFieldEl.value);
+  });
+  searchFieldEl.addEventListener('input', () => searchClearEl.classList.toggle('hidden', !searchFieldEl.value));
+  searchClearEl.addEventListener('click', () => endSearch());
+  searchListEl.addEventListener('click', (event) => {
+    const item = isDomElement(event.target) ? event.target.closest('.searchItem') : null;
+    if (item) showResult(Number(item.dataset.index));
+  });
+  searchPreviousEl.addEventListener('click', () => showResult(searchIndex - 1));
+  searchNextEl.addEventListener('click', () => showResult(searchIndex + 1));
+  searchPositionEl.addEventListener('click', () => openPanel('contents'));
+  document.getElementById('searchEnd')?.addEventListener('click', () => endSearch());
+
+  librarySearchFieldEl.addEventListener('input', () => {
+    completeAuthors();
+    setLibraryQuery(librarySearchFieldEl.value);
+  });
+  librarySearchFieldEl.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') librarySearchFieldEl.blur();
+  });
+  librarySearchClearEl.addEventListener('click', () => setLibraryQuery(''));
+}
+
+/** Finds text in the whole book, a chapter at a time, and lists where it is. */
+async function searchBook(text) {
+  const query = text.trim().replace(/\s+/g, ' ');
+  if (!query) return endSearch();
+  const opened = book;
+  if (!opened) return;
+  const run = ++searchRun;
+  searchFieldEl.blur();
+  clearResult();
+  searchQuery = query;
+  searchResults = [];
+  searchStatusEl.textContent = 'Searching…';
+  showContents();
+
+  const needle = foldMapped(query).text;
+  const found = [];
+  let failed = false;
+  for (const section of opened.spine.spineItems) {
+    if (found.length >= MAX_SEARCH_RESULTS) break;
+    if (!section.linear) continue;
+    try {
+      found.push(...await withSectionDocument(opened, section, (doc) => findInDocument(doc, section, needle, MAX_SEARCH_RESULTS - found.length)));
+    } catch (error) {
+      log.warn('Could not search a section:', section.href, error);
+      failed = true;
+    }
+    if (run !== searchRun) return;
+    // Lets the page answer taps between chapters.
+    await wait(0);
+  }
+  if (run !== searchRun || book !== opened) return;
+
+  searchResults = found.map((result) => ({ ...result, chapter: tocEntryFor(result.href)?.title || '' }));
+  const count = found.length;
+  searchStatusEl.textContent = count === 0 && failed
+    ? 'Could not search this book'
+    : count === 0
+      ? `No results for “${query}”`
+      : count >= MAX_SEARCH_RESULTS
+        ? `The first ${MAX_SEARCH_RESULTS} results`
+        : count === 1 ? '1 result' : `${count} results`;
+  showContents();
+  searchListEl.scrollTop = 0;
+}
+
+/** Each place the folded needle is in the section, up to limit of them. */
+function findInDocument(doc, section, needle, limit) {
+  const root = doc.body || doc.documentElement;
+  if (!root || !needle) return [];
+  const { text, pieces } = documentText(doc, root);
+  const folded = foldMapped(text);
+  const results = [];
+  for (let at = folded.text.indexOf(needle); at >= 0 && results.length < limit; at = folded.text.indexOf(needle, at + needle.length)) {
+    const start = folded.starts[at];
+    const end = folded.ends[at + needle.length - 1];
+    const first = pieceAt(pieces, start);
+    const last = pieceAt(pieces, end - 1);
+    if (!first || !last) continue;
+    const range = doc.createRange();
+    range.setStart(first.node, start - first.start);
+    range.setEnd(last.node, end - last.start);
+    results.push({
+      cfi: section.cfiFromRange(range),
+      href: section.href,
+      index: section.index,
+      before: takeLastWords(collapse(text.slice(Math.max(0, start - 4 * SNIPPET_BEFORE), start)), SNIPPET_BEFORE),
+      match: collapse(text.slice(start, end)),
+      after: takeWords(collapse(text.slice(end, end + 4 * SNIPPET_AFTER)), SNIPPET_AFTER),
+    });
+  }
+  return results;
+}
+
+/**
+ * The text of the document as one string, and where each of its text nodes starts in it. A
+ * space stands between text on different lines, so their words don't run together.
+ */
+function documentText(doc, root) {
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) => (node.nodeType === 1 && UNREAD.has(node.localName) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+  });
+  const pieces = [];
+  let text = '';
+  let lastLine = null;
+  let lineBreak = false;
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.nodeType === 1) {
+      if (node.localName === 'br' || node.localName === 'hr') lineBreak = true;
+      continue;
+    }
+    if (!node.data) continue;
+    const line = lineOf(node, root);
+    if (text && (lineBreak || line !== lastLine)) text += ' ';
+    lastLine = line;
+    lineBreak = false;
+    pieces.push({ node, start: text.length });
+    text += node.data;
+  }
+  return { text, pieces };
+}
+
+/** The element that starts the line the node is on. */
+function lineOf(node, root) {
+  for (let element = node.parentNode; element && element !== root; element = element.parentNode) {
+    if (TEXT_BREAKS.has(element.localName)) return element;
+  }
+  return root;
+}
+
+/** The text node the character at index is in. */
+function pieceAt(pieces, index) {
+  let low = 0;
+  let high = pieces.length - 1;
+  while (low < high) {
+    const middle = (low + high + 1) >> 1;
+    if (pieces[middle].start <= index) low = middle; else high = middle - 1;
+  }
+  const piece = pieces[low];
+  return piece && index >= piece.start && index < piece.start + piece.node.data.length ? piece : null;
+}
+
+/**
+ * The text folded as fold does, and for each of its characters where it starts and ends in the
+ * text. Marks stay with the letter before them, so a match never cuts a letter off its points.
+ */
+function foldMapped(text) {
+  const chars = [];
+  const starts = [];
+  const ends = [];
+  let space = false;
+  for (let i = 0; i < text.length;) {
+    const code = text.codePointAt(i);
+    const size = code > 0xffff ? 2 : 1;
+    const char = code < 128 ? text[i] : text.slice(i, i + size);
+    if (/\s/.test(char)) {
+      if (!space) {
+        chars.push(' ');
+        starts.push(i);
+        ends.push(i + size);
+      }
+      space = true;
+    } else {
+      const folded = code < 128 ? char.toLowerCase() : char.normalize('NFD').replace(MARKS, '').toLowerCase();
+      if (folded) {
+        for (const each of folded) {
+          chars.push(each);
+          starts.push(i);
+          ends.push(i + size);
+        }
+        space = false;
+      } else if (ends.length) {
+        ends[ends.length - 1] = i + size;
+      }
+    }
+    i += size;
+  }
+  return { text: chars.join(''), starts, ends };
+}
+
+function collapse(text) {
+  return text.replace(/\s+/g, ' ');
+}
+
+/** The end of the text, from a word break, about length characters long. */
+function takeLastWords(text, length) {
+  if (text.length <= length) return text;
+  const cut = text.length - length;
+  const space = text.indexOf(' ', cut);
+  return space < 0 || space - cut > length / 2 ? text.slice(cut) : text.slice(space);
+}
+
+/** The start of the text, up to a word break, about length characters long. */
+function takeWords(text, length) {
+  if (text.length <= length) return text;
+  const space = text.lastIndexOf(' ', length);
+  return space < length / 2 ? text.slice(0, length) : text.slice(0, space);
+}
+
+/** The contents list, or a search's results in its place. */
+function showContents() {
+  const searching = searchQuery !== null;
+  searchStatusEl.classList.toggle('hidden', !searching);
+  searchListEl.classList.toggle('hidden', !searching || !searchResults.length);
+  tocListEl.classList.toggle('hidden', searching);
+  if (searching) renderSearchResults();
+}
+
+function renderSearchResults() {
+  if (searchListEl.childElementCount === searchResults.length && searchListEl.dataset.query === searchQuery) {
+    markActiveResult();
+    return;
+  }
+  searchListEl.innerHTML = '';
+  searchListEl.dataset.query = searchQuery || '';
+  searchResults.forEach((result, index) => {
+    const li = document.createElement('li');
+    const button = document.createElement('button');
+    button.className = 'searchItem';
+    button.dataset.index = index;
+    if (result.chapter) {
+      const chapter = document.createElement('span');
+      chapter.className = 'searchChapter';
+      chapter.dir = 'auto';
+      chapter.textContent = result.chapter;
+      button.appendChild(chapter);
+    }
+    // The match with some of the text around it, cut at word breaks, the match inverted.
+    const text = document.createElement('span');
+    text.className = 'searchText';
+    text.dir = 'auto';
+    const match = document.createElement('mark');
+    match.textContent = result.match;
+    text.append(result.before ? `…${result.before}` : '', match, result.after ? `${result.after}…` : '');
+    button.appendChild(text);
+    li.appendChild(button);
+    searchListEl.appendChild(li);
+  });
+  markActiveResult();
+}
+
+function markActiveResult() {
+  searchListEl.querySelector('.searchItem.active')?.classList.remove('active');
+  const active = searchListEl.querySelector(`.searchItem[data-index="${searchIndex}"]`);
+  active?.classList.add('active');
+  active?.scrollIntoView({ block: 'nearest' });
+}
+
+/** Turns to a result and marks it there; the bar offers the others. */
+async function showResult(index) {
+  const result = searchResults[index];
+  if (!result || !rendition) return;
+  // A jump to a result starts a new trail; Back no longer returns to old links.
+  clearLinkHistory();
+  showEnd(false);
+  keptPlace = null;
+  searchIndex = index;
+  updateSearchBar();
+  markActiveResult();
+  try {
+    await rendition.display(result.cfi);
+  } catch (error) {
+    log.warn('Could not show a search result:', error);
+  }
+  closePanel();
+  rendition.getContents().forEach(markContents);
+  placeSearchBar();
+}
+
+/** Marks the result on the page, inverted like a selected button, if it is in this section. */
+function markContents(contents) {
+  const win = contents?.window;
+  const doc = contents?.document;
+  if (!win || !doc) return;
+  const result = searchResults[searchIndex];
+  const range = result ? matchRange(contents, result) : null;
+  if (win.CSS?.highlights && typeof win.Highlight === 'function') {
+    if (!range) {
+      win.CSS.highlights.delete(MATCH_HIGHLIGHT);
+      return;
+    }
+    let style = doc.getElementById('squidread-match-style');
+    if (!style) {
+      style = doc.createElement('style');
+      style.id = 'squidread-match-style';
+      doc.head.appendChild(style);
+    }
+    style.textContent = matchStyle();
+    win.CSS.highlights.set(MATCH_HIGHLIGHT, new win.Highlight(range));
+    return;
+  }
+  // Without highlights: a white box over the match, blended by difference (see styles.css), inverts it the same.
+  rendition.annotations.remove(markedCfi, 'highlight');
+  markedCfi = null;
+  if (range) {
+    markedCfi = result.cfi;
+    rendition.annotations.highlight(markedCfi, {}, null, MATCH_HIGHLIGHT, { fill: '#fff', 'fill-opacity': '1', 'mix-blend-mode': 'difference' });
+  }
+}
+let markedCfi = null;
+
+function matchStyle() {
+  const styles = getComputedStyle(document.documentElement);
+  return `::highlight(${MATCH_HIGHLIGHT}) { background-color: ${styles.getPropertyValue('--ink').trim()}; color: ${styles.getPropertyValue('--paper').trim()}; }`;
+}
+
+function matchRange(contents, result) {
+  return contents.sectionIndex === result.index ? cfiRange(contents, result.cfi) : null;
+}
+
+/** The text at cfi, if it is in this section; null otherwise. */
+function cfiRange(contents, cfi) {
+  try {
+    if (contents.sectionIndex !== new window.ePub.CFI(cfi).spinePos) return null;
+    return contents.range(cfi);
+  } catch (error) {
+    log.debug('Could not find a place on the page:', error);
+    return null;
+  }
+}
+
+/** Where the match is on the page, as a share of the page's height from the top, or null when it isn't on the page showing. */
+function matchPosition() {
+  const result = searchResults[searchIndex];
+  return result ? pagePosition(result.cfi) : null;
+}
+
+/** Where the text at cfi is on the page, as a share of the page's height from the top, or null when it isn't on the page showing. */
+function pagePosition(cfi) {
+  const viewer = viewerEl.getBoundingClientRect();
+  if (!rendition || viewer.height <= 0) return null;
+  for (const contents of rendition.getContents()) {
+    const range = cfiRange(contents, cfi);
+    const frame = contents.window?.frameElement?.getBoundingClientRect();
+    if (!range || !frame) continue;
+    const rect = range.getBoundingClientRect();
+    const left = frame.left + rect.left;
+    if (left + Math.max(rect.width, 1) > viewer.left && left < viewer.right) {
+      return (frame.top + (rect.top + rect.bottom) / 2 - viewer.top) / viewer.height;
+    }
+  }
+  return null;
+}
+
+/** Moves the bar to the top of the page when the match is low on it, where the bar would cover it. */
+function placeSearchBar() {
+  const position = matchPosition();
+  if (position != null) searchBarEl.classList.toggle('top', position > LOW_MATCH);
+}
+
+function updateSearchBar() {
+  if (searchQuery === null) return;
+  // The words kept apart, so quotes around right-to-left ones face the right way.
+  const position = document.createElement('span');
+  position.append(`${searchIndex + 1} of ${searchResults.length} · “`, Object.assign(document.createElement('bdi'), { textContent: searchQuery }), '”');
+  searchPositionEl.replaceChildren(position);
+  searchPreviousEl.disabled = searchIndex <= 0;
+  searchNextEl.disabled = searchIndex >= searchResults.length - 1;
+  searchBarEl.classList.remove('hidden');
+}
+
+function clearResult() {
+  searchIndex = -1;
+  searchBarEl.classList.add('hidden');
+  searchBarEl.classList.remove('top');
+  rendition?.getContents().forEach(markContents);
+}
+
+/** Back to the contents list, and to reading without a mark on the page. */
+function endSearch() {
+  resetSearch();
+  showContents();
+}
+
+function resetSearch() {
+  searchRun++;
+  clearResult();
+  searchQuery = null;
+  searchResults = [];
+  searchListEl.innerHTML = '';
+  searchFieldEl.value = '';
+  searchClearEl.classList.add('hidden');
+}
+
+// --- The end of the book -------------------------------------------------------
+
+function wireBookEndEvents() {
+  document.getElementById('bookEndRestart')?.addEventListener('click', () => goToBeginning());
+  document.getElementById('bookEndLibrary')?.addEventListener('click', () => openPanel('library'));
+  document.getElementById('bookEndDelete')?.addEventListener('click', () => currentRecord && confirmDelete(currentRecord.id));
+  document.getElementById('bookEndClose')?.addEventListener('click', () => showEnd(false));
+}
+
+function showEnd(visible) {
+  if (bookEndEl.classList.contains('hidden') !== visible) return;
+  if (visible) bookEndTitleEl.textContent = currentRecord?.title || currentRecord?.name || '';
+  bookEndEl.classList.toggle('hidden', !visible);
+}
+
+function goToBeginning() {
+  const first = book?.spine?.first();
+  if (!rendition || !first) return;
+  clearLinkHistory();
+  showEnd(false);
+  keptPlace = null;
+  rendition.display(first.href).catch((error) => log.warn('Failed to go to the beginning:', error));
+}
+
+/** Asks first; a deleted book is gone, with where it was read to. */
+function confirmDelete(id) {
+  return new Promise((resolve) => {
+    db.get('books', id).then((record) => {
+      if (!record) return resolve();
+      document.getElementById('deleteDialogTitle').textContent = record.title || record.name;
+      const confirm = document.getElementById('deleteConfirm');
+      const onConfirm = async () => {
+        deleteDialogEl.close();
+        await deleteBook(id);
+      };
+      confirm.addEventListener('click', onConfirm, { once: true });
+      deleteDialogEl.addEventListener('close', () => {
+        confirm.removeEventListener('click', onConfirm);
+        resolve();
+      }, { once: true });
+      deleteDialogEl.showModal();
+    });
+  });
+}
+
+async function deleteBook(id) {
+  await db.delete('books', id);
+  if (localStorage.getItem('lastOpenedBookId') === id) localStorage.removeItem('lastOpenedBookId');
+  const wasOpen = currentRecord?.id === id;
+  if (wasOpen) clearViewer();
+  await renderLibrary();
+  await refreshEmptyState();
+  // Deleted from the end screen: on to the next book. An empty library has its own screen.
+  if (wasOpen && panelEl.classList.contains('hidden') && await db.count('books')) openPanel('library');
+}
+
+// --- Links -------------------------------------------------------------------
+
+/**
+ * A link tapped in the book. Links out of it open in a new tab, never inside the reader;
+ * footnotes open over the page; other links turn to where they point, and Back returns.
+ */
+async function handleBookLink(link) {
+  const href = link.getAttribute('href');
+  if (!href || !rendition) return;
+  if (/^(https?|mailto):/i.test(href)) {
+    window.open(href, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  const target = bookPath(link, href);
+  if (!target) return;
+  if (isNoteReference(link) && await showFootnote(link, target)) return;
+  followLink(target);
+}
+
+/** Where a link points, relative to the book's package as epub.js has it; null if out of the book. */
+function bookPath(link, href) {
+  try {
+    const base = documentBase(link.ownerDocument);
+    const url = new URL(href, base);
+    if (url.origin !== base.origin) return null;
+    return book.path.relative(decodeURIComponent(url.pathname)) + url.hash;
+  } catch (error) {
+    log.debug('Could not follow a link:', href, error);
+    return null;
+  }
+}
+
+/** The page's own file in the book: epub.js names it in the page's <base>. */
+function documentBase(doc) {
+  return new URL(doc.querySelector('base')?.getAttribute('href') || '/', 'https://book.invalid/');
+}
+
+function isNoteReference(link) {
+  const type = link.getAttributeNS(OPS_NAMESPACE, 'type') || link.getAttribute('epub:type') || '';
+  return type.split(/\s+/).includes('noteref');
+}
+
+/** Shows the note a reference points to, if it can be found; reports whether it was. */
+async function showFootnote(link, target) {
+  const [path, id] = target.split('#');
+  if (!id) return false;
+  const read = (doc) => {
+    let note = doc.getElementById(decodeURIComponent(id));
+    // An anchor marking the note's place: its text is around it.
+    if (note && (note.localName === 'a' || !note.textContent.trim())) note = note.parentElement;
+    return note ? collapse(note.textContent).trim().slice(0, MAX_NOTE_LENGTH) : '';
+  };
+  let text = '';
+  try {
+    const here = book.path.relative(decodeURIComponent(documentBase(link.ownerDocument).pathname));
+    const section = path && path !== here ? book.spine.get(path) : null;
+    text = section ? await withSectionDocument(book, section, read) : read(link.ownerDocument);
+  } catch (error) {
+    log.debug('Could not read a footnote:', error);
+  }
+  if (!text) return false;
+  document.getElementById('noteText').textContent = text;
+  noteDialogEl.showModal();
+  return true;
+}
+
+/** Turns to where a link points, remembering where it was followed from. */
+function followLink(target) {
+  const here = rendition.currentLocation?.()?.start;
+  const last = linkHistory[linkHistory.length - 1];
+  const targetSection = book.spine.get(target.split('#')[0]);
+  if (last && targetSection && book.section(last)?.index === targetSection.index) {
+    // Following a link back to where the last one was followed from, as notes do.
+    linkHistory.pop();
+    ignoredPops++;
+    history.back();
+  } else if (here?.cfi) {
+    linkHistory.push(here.cfi);
+    if (linkHistory.length > MAX_LINK_HISTORY) linkHistory.shift();
+    history.pushState({ squidreadLink: true }, '');
+  }
+  showEnd(false);
+  keptPlace = null;
+  rendition.display(target).catch(async (error) => {
+    log.debug('Direct link navigation failed, trying spine match:', target, error);
+    const targetSpine = findSpineItemByHref(target);
+    if (targetSpine) await rendition.display(targetSpine.href);
+  });
+}
+
+/** Forgets the trail of links; Back leaves the reader again, as before it was followed. */
+function clearLinkHistory() {
+  if (!linkHistory.length) return;
+  const steps = linkHistory.length;
+  linkHistory.length = 0;
+  ignoredPops++;
+  history.go(-steps);
+}
+
+// --- Page layout ---------------------------------------------------------------
+
+const PAGE_BREAKS = new Set(['page', 'left', 'right', 'recto', 'verso']);
+// Where the book's style sheets are read, apart from the reader's own.
+const cssDocument = document.implementation.createHTMLDocument('');
+
+/**
+ * Books ask for a new page before chapters and pictures with page breaks, but epub.js lays the
+ * book out in columns, where a page break means nothing. The elements they apply to get column
+ * breaks, which start a new page there. Done to each section's own document before epub.js
+ * lays it out, so a page shown from a saved place is the page it was.
+ */
+async function keepPageBreaks(opened, doc, section, cache) {
+  const breaks = [];
+  for (const node of doc.querySelectorAll('link[href], style')) {
+    if (node.localName === 'style') {
+      breaks.push(...pageBreakRules(node.textContent));
+    } else if (/(^|\s)stylesheet(\s|$)/i.test(node.getAttribute('rel') || '')) {
+      const path = new URL(node.getAttribute('href'), new URL(section.url, 'https://book.invalid/')).pathname;
+      if (!cache.has(path)) cache.set(path, opened.load(path).then(pageBreakRules, () => []));
+      breaks.push(...await cache.get(path));
+    }
+  }
+  const fix = (element, rule) => {
+    if (rule.before) element.style.breakBefore = 'column';
+    if (rule.after) element.style.breakAfter = 'column';
+  };
+  for (const rule of breaks) {
+    let elements = [];
+    // Selectors the reader's own documents can't read, such as those with a namespace, stay as they are.
+    try {
+      elements = doc.querySelectorAll(rule.selector);
+    } catch (error) {}
+    elements.forEach((element) => element.style && fix(element, rule));
+  }
+  doc.querySelectorAll('[style]').forEach((element) => {
+    if (!element.style) return;
+    fix(element, { before: PAGE_BREAKS.has(element.style.breakBefore), after: PAGE_BREAKS.has(element.style.breakAfter) });
+  });
+}
+
+/** The rules of a style sheet that ask for a page break, with what they select. */
+function pageBreakRules(text) {
+  if (typeof text !== 'string') return [];
+  const style = cssDocument.createElement('style');
+  style.textContent = text;
+  cssDocument.head.appendChild(style);
+  const rules = [];
+  const walk = (list) => {
+    for (const rule of list) {
+      if (rule.style && rule.selectorText) {
+        const before = PAGE_BREAKS.has(rule.style.breakBefore);
+        const after = PAGE_BREAKS.has(rule.style.breakAfter);
+        if (before || after) rules.push({ selector: rule.selectorText, before, after });
+      }
+      if (rule.cssRules) walk(rule.cssRules);
+    }
+  };
+  try {
+    walk(style.sheet?.cssRules || []);
+  } finally {
+    style.remove();
+  }
+  return rules;
 }
 
 function isEditableTarget(target) {
@@ -695,14 +1398,16 @@ async function saveBook(name, blob) {
     return;
   }
   
-  // New book - extract title and cover from EPUB
+  // New book - extract title, author and cover from EPUB
   let title = name.replace(/\.epub$/i, '');
   let coverDataUrl = null;
-  
+  let author = '';
+
   try {
     await ensureEpubDepsLoaded();
     const tempBook = await ePub(blob).opened;
     title = tempBook.packaging?.metadata?.title || title;
+    author = await readAuthor(blob);
     
     // Try to get cover image and convert to data URL
     if (tempBook.cover) {
@@ -725,6 +1430,7 @@ async function saveBook(name, blob) {
     id,
     name,
     title,
+    author,
     blob,
     coverDataUrl,
     createdAt: Date.now(),
@@ -749,23 +1455,37 @@ function blobToDataUrl(blob) {
   });
 }
 
+let libraryQuery = '';
+let authorsCompleted = false;
+
+/**
+ * The books, most recently opened first, then the "Add EPUB" tile. While there are no books, a
+ * tile suggesting free books comes before it, and a note follows across the whole row. With a
+ * query, only the books whose title or author has every word of it, or a note that none do.
+ */
 async function renderLibrary() {
   log.debug('Rendering library');
   const books = await db.getAll('books');
   books.sort((a, b) => (b.lastOpened || b.createdAt) - (a.lastOpened || a.createdAt));
-  
+  librarySearchRowEl?.classList.toggle('hidden', !books.length);
+
+  const words = fold(libraryQuery).split(' ').filter(Boolean);
+  const filtering = words.length > 0 && books.length > 0;
+  const shown = filtering
+    ? books.filter((record) => {
+      const text = fold(`${record.title || record.name} ${record.author || ''}`);
+      return words.every((word) => text.includes(word));
+    })
+    : books;
+
   // Clear library but keep the Add EPUB button (and its wired handlers)
   const addButton = libraryEl.querySelector('.libraryAddItem');
   libraryEl.innerHTML = '';
-  if (addButton) libraryEl.appendChild(addButton);
-  
-  if (!books.length) {
-    return;
-  }
 
-  for (const record of books) {
+  for (const record of shown) {
     const li = document.createElement('li');
     li.className = 'libraryItem';
+    li.classList.toggle('current', record.id === currentRecord?.id);
 
     const hasCoverData = record.coverDataUrl && record.coverDataUrl.startsWith('data:');
 
@@ -801,6 +1521,7 @@ async function renderLibrary() {
     // Book title
     const titleEl = document.createElement('div');
     titleEl.className = 'bookTitle';
+    titleEl.dir = 'auto';
     titleEl.textContent = record.title || record.name;
     portraitBtn.appendChild(titleEl);
 
@@ -817,40 +1538,241 @@ async function renderLibrary() {
 
     libraryEl.appendChild(li);
   }
-}
 
-function renderToc(tocItems = []) {
-  if (!tocListEl) return;
-  tocListEl.innerHTML = '';
-  if (!tocItems.length) {
-    const empty = document.createElement('li');
-    empty.className = 'meta';
-    empty.textContent = 'No table of contents available.';
-    tocListEl.appendChild(empty);
+  if (filtering) {
+    if (!shown.length) libraryEl.appendChild(libraryHint(`No books match “${libraryQuery.trim()}”`));
     return;
   }
+  if (!books.length) libraryEl.appendChild(librarySuggestion());
+  if (addButton) libraryEl.appendChild(addButton);
+  if (!books.length) libraryEl.appendChild(libraryHint('No books yet. Tap “+ Add EPUB”, or drop an EPUB file here.'));
+}
 
-  const addItems = (items, level = 0) => {
-    items.forEach((item) => {
-      const li = document.createElement('li');
-      const btn = document.createElement('button');
-      btn.className = 'tocItem';
-      btn.dataset.href = item.href || '';
-      if (item.cfi) btn.dataset.cfi = item.cfi;
-      btn.textContent = item.label || item.title || 'Untitled';
-      btn.style.paddingInlineStart = `${16 + level * 16}px`;
-      if (!item.href) {
-        btn.disabled = true;
+function libraryHint(text) {
+  const li = document.createElement('li');
+  li.className = 'libraryHint';
+  li.textContent = text;
+  return li;
+}
+
+/** Next to the "Add EPUB" tile while the library is empty: where free books can be found. */
+function librarySuggestion() {
+  const li = document.createElement('li');
+  li.className = 'librarySuggestion';
+  const heading = document.createElement('h3');
+  heading.textContent = 'Free books';
+  const text = document.createElement('p');
+  text.textContent = 'Project Gutenberg has thousands of free EPUBs. For example:';
+  li.append(heading, text, externalLink('Dracula', GUTENBERG_EXAMPLE_URL), externalLink('More books', GUTENBERG_URL));
+  return li;
+}
+
+function externalLink(label, href) {
+  const link = document.createElement('a');
+  link.className = 'linkButton';
+  link.href = href;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = label;
+  return link;
+}
+
+function setLibraryQuery(value) {
+  if (librarySearchFieldEl.value !== value) librarySearchFieldEl.value = value;
+  librarySearchClearEl.classList.toggle('hidden', !value);
+  if (libraryQuery === value) return;
+  libraryQuery = value;
+  renderLibrary();
+  libraryEl.scrollTop = 0;
+}
+
+/**
+ * Reads the authors of books added before they were kept, the first time the library is
+ * searched; until then nothing needs them.
+ */
+async function completeAuthors() {
+  if (authorsCompleted) return;
+  authorsCompleted = true;
+  const missing = (await db.getAll('books')).filter((record) => typeof record.author !== 'string');
+  if (!missing.length) return;
+  try {
+    await ensureEpubDepsLoaded();
+  } catch (error) {
+    log.warn('Could not load the EPUB reader to find authors:', error);
+    return;
+  }
+  for (const record of missing) {
+    record.author = await readAuthor(record.blob);
+    await db.put('books', record);
+  }
+  if (libraryQuery.trim()) await renderLibrary();
+}
+
+/**
+ * The authors named in the package document: its creators, less those whose role says they
+ * are not the author (an editor or illustrator). Empty when there are none or the file can't
+ * be read; books come from anywhere, so nothing here may throw.
+ */
+async function readAuthor(blob) {
+  try {
+    const zip = await window.JSZip.loadAsync(blob);
+    const container = await readSmall(zip, 'META-INF/container.xml');
+    const parser = new DOMParser();
+    const rootfile = container && parser.parseFromString(container, 'application/xml').getElementsByTagNameNS('*', 'rootfile')[0];
+    const packagePath = rootfile?.getAttribute('full-path');
+    const document = packagePath && await readSmall(zip, packagePath);
+    if (!document) return '';
+    const creators = [...parser.parseFromString(document, 'application/xml').getElementsByTagNameNS(DC_NAMESPACE, 'creator')]
+      .filter((creator) => {
+        const role = [...creator.attributes].find((attribute) => attribute.localName === 'role')?.value;
+        return !role || role === 'aut';
+      })
+      .map((creator) => cleanTitle(creator.textContent))
+      .filter(Boolean);
+    return cleanTitle(creators.join(', '));
+  } catch (error) {
+    log.debug('Could not read the author:', error);
+    return '';
+  }
+}
+
+/** A file in the book, when it is small enough to be what it claims; nothing otherwise. */
+async function readSmall(zip, path) {
+  const entry = zip.file(path);
+  // The size the zip's directory gives; JSZip refuses a file that turns out bigger than that.
+  if (!entry || entry._data?.uncompressedSize > MAX_PACKAGE_BYTES) return null;
+  return entry.async('string');
+}
+
+/**
+ * A title fit to show: on one line, and not so long that it overflows. Titles come from files,
+ * so they can be anything.
+ */
+function cleanTitle(title) {
+  const clean = (title || '').replace(/[\p{Cc}\s]+/gu, ' ').trim();
+  return clean.length > MAX_TITLE_LENGTH ? clean.slice(0, MAX_TITLE_LENGTH) : clean;
+}
+
+/** Lower case, without accents or vowel points, on one line. */
+function fold(text) {
+  return text.normalize('NFD').replace(MARKS, '').replace(/\s+/g, ' ').toLowerCase();
+}
+
+/** The contents list, flat, numbered as in the footer ("2.3"). */
+function buildTocEntries(items) {
+  const entries = [];
+  const visit = (list, depth, parentNumber) => {
+    // Deeper levels than any real book has are left out rather than recursed into.
+    if (depth > MAX_TOC_DEPTH) return;
+    let count = 0;
+    for (const item of list) {
+      let number = '';
+      if (item.href) {
+        count++;
+        number = parentNumber ? `${parentNumber}.${count}` : `${count}`;
       }
-      li.appendChild(btn);
-      tocListEl.appendChild(li);
-      if (item.subitems && item.subitems.length) {
-        addItems(item.subitems, level + 1);
-      }
-    });
+      entries.push({
+        title: cleanTitle(item.label || item.title) || cleanTitle(item.href) || 'Untitled',
+        href: item.href || '',
+        path: (item.href || '').split('#')[0],
+        depth,
+        number,
+      });
+      if (item.subitems?.length) visit(item.subitems, depth + 1, number || parentNumber);
+    }
   };
+  visit(items, 0, '');
+  return entries;
+}
 
-  addItems(tocItems);
+/**
+ * Stands in for a missing table of contents: one entry per section of the reading order, in
+ * order, numbered until their headings are found (see findSectionTitles).
+ */
+function buildSections() {
+  const entries = [];
+  book?.spine?.each((section) => {
+    if (!section.linear) return;
+    const number = `${entries.length + 1}`;
+    entries.push({ title: `Section ${number}`, href: section.href, path: section.href, depth: 0, number, section });
+  });
+  return entries;
+}
+
+/**
+ * Names the sections of a book without a table of contents after the first heading in each,
+ * in the background, so the book opens as fast as any other.
+ */
+async function findSectionTitles(opened) {
+  for (const entry of tocEntries) {
+    if (book !== opened || !entry.section) return;
+    try {
+      const heading = await withSectionDocument(opened, entry.section, (doc) => doc.querySelector('h1, h2, h3, h4, h5, h6')?.textContent);
+      const title = cleanTitle(heading);
+      if (title) entry.title = title;
+    } catch (error) {
+      log.debug('Could not read a section heading:', error);
+    }
+  }
+  if (book !== opened) return;
+  renderToc();
+  if (rendition?.location) updateChapterInfo(rendition.location);
+}
+
+/**
+ * Runs read on a section's own document, loaded apart from the page showing it, and lets the
+ * document go after unless it was already loaded.
+ */
+async function withSectionDocument(opened, section, read) {
+  const loaded = !!section.contents;
+  const contents = await section.load(opened.load.bind(opened));
+  try {
+    return read(contents.ownerDocument);
+  } finally {
+    if (!loaded) section.unload();
+  }
+}
+
+/** The contents list, or a note saying why there is none, or what stands in for it. */
+function renderToc() {
+  if (!tocListEl) return;
+  tocListEl.innerHTML = '';
+  const note = !book
+    ? 'Open a book to see its table of contents.'
+    : !tocEntries.length
+      ? 'This book has no table of contents.'
+      : showsSections
+        ? 'This book has no table of contents. Its sections, in order:'
+        : null;
+  if (note) {
+    const li = document.createElement('li');
+    li.className = 'meta';
+    li.textContent = note;
+    tocListEl.appendChild(li);
+  }
+
+  tocEntries.forEach((entry, index) => {
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.className = 'tocItem';
+    btn.dataset.href = entry.href;
+    btn.dataset.index = index;
+    btn.textContent = entry.title;
+    // Deeper entries keep this indent, so they never squeeze to nothing.
+    btn.style.paddingInlineStart = `${16 + Math.min(entry.depth, MAX_INDENT_DEPTH) * 16}px`;
+    btn.disabled = !entry.href;
+    li.appendChild(btn);
+    tocListEl.appendChild(li);
+  });
+}
+
+/** The first entry pointing at the section, as the footer names it. */
+function tocEntryFor(sectionHref) {
+  if (!sectionHref) return null;
+  // Contents name files from where the contents file is, the spine from the package; the same
+  // file can be named with more of its path in one than in the other.
+  const samePath = (path) => path === sectionHref || sectionHref.endsWith(`/${path}`) || path.endsWith(`/${sectionHref}`);
+  return tocEntries.find((entry) => entry.path && samePath(entry.path)) || null;
 }
 
 // A block holding one picture and no text is a page of a comic or a picture
@@ -922,57 +1844,8 @@ function injectContentCSS() {
       
       // Mark as processed
       injectedIframes.add(iframe);
-      
-      // Handle internal links
-      if (!doc.body.dataset.squidreadLinksBound) {
-        doc.body.dataset.squidreadLinksBound = '1';
-        const links = doc.querySelectorAll('a[href]');
-        links.forEach(link => {
-          link.addEventListener('click', async (e) => {
-            const href = link.getAttribute('href');
-            if (!href) return;
-            e.preventDefault();
 
-            // Links out of the book open in a new tab, never inside the reader.
-            let target = null;
-            try {
-              target = new URL(href, doc.baseURI);
-            } catch (error) {}
-            if (target && (target.protocol === 'http:' || target.protocol === 'https:')) {
-              window.open(target.href, '_blank', 'noopener,noreferrer');
-              return;
-            }
-            
-            try {
-              // Try direct navigation first
-              await rendition.display(href);
-            } catch (error) {
-              log.debug('Direct link navigation failed, trying spine match:', href, error);
-              
-              // Fallback: search spine by href
-            const targetSpine = findSpineItemByHref(href);
-              
-              if (targetSpine) {
-                // If there's an anchor, keep it
-                const anchor = href.includes('#') ? href.split('#')[1] : null;
-                if (anchor) {
-                  await rendition.display(targetSpine);
-                  // Try to scroll to anchor after display
-                  setTimeout(() => {
-                    // The book chooses the anchor; looked up by name, never as a selector.
-                    const targetEl = doc.getElementById(anchor) || doc.getElementsByName(anchor)[0];
-                    if (targetEl) targetEl.scrollIntoView();
-                  }, 100);
-                } else {
-                  await rendition.display(targetSpine);
-                }
-              }
-            }
-          });
-        });
-      }
-
-      // Click/keydown handlers are attached via rendition content hooks.
+      // Click/keydown handlers, links among them, are attached via rendition content hooks.
     } catch (e) {
       log.debug('Could not inject CSS into iframe:', e);
     }
@@ -1077,12 +1950,38 @@ async function loadBook(id) {
     throw error;
   }
   
-  // Get page progression direction (RTL or LTR)
-  const pageDir = book.packaging?.metadata?.direction;
-  isRTL = pageDir === 'rtl';
+  // Right to left as the book's page progression says, or by its language when it says nothing.
+  const metadata = book.packaging?.metadata || {};
+  const pageDir = metadata.direction;
+  isRTL = pageDir === 'rtl' || (pageDir !== 'ltr' && RTL_LANGUAGES.has(String(metadata.language || '').toLowerCase().split('-')[0]));
+  // epub.js lays out pages from this too.
+  if (isRTL) metadata.direction = 'rtl';
   
   // Set TOC direction
   tocListEl.dir = isRTL ? 'rtl' : 'ltr';
+  searchListEl.dir = tocListEl.dir;
+
+  // The contents first, so the footer can name the chapter of the first page shown. epub.js
+  // never settles the contents of a book whose contents file is broken; its sections stand in.
+  try {
+    const nav = await Promise.race([book.loaded.navigation, wait(NAVIGATION_WAIT_MS)]);
+    tocEntries = buildTocEntries(nav?.toc || []);
+  } catch (error) {
+    log.warn('Failed to load TOC:', error);
+    tocEntries = [];
+  }
+  showsSections = !tocEntries.length;
+  if (showsSections) tocEntries = buildSections();
+  // Nor the book's list of printed pages, which it needs to report where each page is.
+  book.pageList ??= { pageFromCfi: () => -1, destroy() {} };
+  renderToc();
+  searchRowEl.classList.remove('hidden');
+
+  const opened = book;
+  const styleSheets = new Map();
+  opened.spine.hooks.content.register((doc, section) => keepPageBreaks(opened, doc, section, styleSheets).catch((error) => {
+    log.debug('Could not keep page breaks:', error);
+  }));
   
   rendition = book.renderTo('viewer', {
     width: '100%',
@@ -1102,8 +2001,11 @@ async function loadBook(id) {
         doc.body.dataset.squidreadContentHooksBound = '1';
         doc.addEventListener('click', handleRenditionContentPointer, true);
         doc.addEventListener('keydown', handleReaderKeydown);
+        doc.addEventListener('touchstart', handleTouchStart, { passive: true });
+        doc.addEventListener('touchend', handleTouchEnd);
       }
       fitImagePages(doc);
+      markContents(contents);
     } catch (error) {
       log.debug('Failed to bind rendition content hooks:', error);
     }
@@ -1115,6 +2017,9 @@ async function loadBook(id) {
     lockIframeHeight();
     injectContentCSS();
     updatePosition(location);
+    // Moved away from the end, by the contents or a new layout: the page itself shows.
+    if (!location?.atEnd) showEnd(false);
+    if (!searchBarEl.classList.contains('hidden')) placeSearchBar();
     currentRecord.lastLocation = location?.start?.cfi || null;
     await db.put('books', currentRecord);
   });
@@ -1151,14 +2056,6 @@ async function loadBook(id) {
       currentFontSize = parseFloat(savedFontSize);
       applyFontSize();
     }
-
-    try {
-      const nav = await book.loaded.navigation;
-      renderToc(nav?.toc || []);
-    } catch (error) {
-      log.warn('Failed to load TOC:', error);
-      renderToc([]);
-    }
     
     // Final CSS injection
     await wait(150);
@@ -1166,6 +2063,8 @@ async function loadBook(id) {
   } catch (error) {
     log.error('Failed to display EPUB:', error);
   }
+
+  if (showsSections) findSectionTitles(book);
 
   book.ready.then(async () => {
     try {
@@ -1193,15 +2092,39 @@ function closePanel() {
 
 
 function adjustFontSize(delta) {
-  currentFontSize = Math.max(0.5, Math.min(2.0, currentFontSize + delta));
-  applyFontSize();
-  localStorage.setItem('squidreadFontSize', currentFontSize);
+  setFontSize(currentFontSize + delta);
 }
 
 function resetFontSize() {
-  currentFontSize = 1.0;
+  setFontSize(1.0);
+}
+
+function setFontSize(value) {
+  // Round to one decimal so repeated steps don't drift.
+  const size = Math.max(0.5, Math.min(2.0, Math.round(value * 10) / 10));
+  if (size === currentFontSize) return;
+  // epub.js keeps the page's number in the chapter, not its words, so a bigger size would show
+  // text from before them. The words are kept for further changes until the page is turned.
+  keptPlace ??= rendition?.currentLocation?.()?.start?.cfi || null;
+  currentFontSize = size;
   applyFontSize();
   localStorage.setItem('squidreadFontSize', currentFontSize);
+  restorePlace(KEEP_PLACE_TRIES);
+}
+
+/**
+ * Turns to the page the kept words are now on, once the new layout has settled; epub.js moves
+ * the page again as it adjusts, so it looks a few times.
+ */
+function restorePlace(tries) {
+  clearTimeout(placeTimer);
+  placeTimer = setTimeout(async () => {
+    if (!keptPlace || !rendition) return;
+    if (pagePosition(keptPlace) === null) {
+      await rendition.display(keptPlace).catch((error) => log.debug('Could not keep the place:', error));
+    }
+    if (tries > 1) restorePlace(tries - 1);
+  }, KEEP_PLACE_MS);
 }
 
 function applyFontSize() {
@@ -1231,12 +2154,12 @@ function switchPanelSection(section) {
     sec.classList.toggle('active', sec === panel);
   });
   
-  // Scroll active TOC item into view if switching to contents
+  // Scroll the active TOC item, or search result, into view if switching to contents
   if (section === 'contents') {
     setTimeout(() => {
-      const activeItem = tocListEl?.querySelector('.tocItem.active');
+      const activeItem = searchQuery !== null ? searchListEl.querySelector('.searchItem.active') : tocListEl?.querySelector('.tocItem.active');
       if (activeItem) {
-        activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        activeItem.scrollIntoView({ block: 'nearest' });
       }
     }, 0);
   }
@@ -1244,6 +2167,10 @@ function switchPanelSection(section) {
 
 function clearViewer() {
   setViewerEmptyState(true);
+  resetSearch();
+  showEnd(false);
+  clearLinkHistory();
+  keptPlace = null;
   if (rendition) {
     rendition.destroy();
     rendition = null;
@@ -1261,7 +2188,11 @@ function clearViewer() {
   if (menuTitleEl) {
     menuTitleEl.textContent = 'Squidread';
   }
-  renderToc([]);
+  tocEntries = [];
+  showsSections = false;
+  searchRowEl.classList.add('hidden');
+  renderToc();
+  refreshEmptyState();
 }
 
 function setViewerEmptyState(visible) {
@@ -1269,10 +2200,25 @@ function setViewerEmptyState(visible) {
   viewerEmptyStateEl.classList.toggle('hidden', !visible);
 }
 
-function openPanel() {
+/**
+ * What the reader shows without a book: with an empty library, what it is for and where books
+ * come from; otherwise a way to the library.
+ */
+async function refreshEmptyState() {
+  const empty = !(await db.count('books'));
+  viewerEmptyTitleEl.textContent = empty ? 'This is where you read' : 'No book selected';
+  readerIntroEl.classList.toggle('hidden', !empty);
+  selectBookBtn.classList.toggle('hidden', empty);
+  // Only while the tap zones are as they come: then it's true.
+  const defaults = getDefaultZoneMap();
+  readerIntroZonesEl.classList.toggle('hidden', Object.keys(defaults).some((key) => zoneActionMap[key] !== defaults[key]));
+}
+
+function openPanel(section) {
   if (panelEl.classList.contains('hidden')) {
     togglePanel();
   }
+  if (section) switchPanelSection(section);
 }
 
 function cyclePanelSection(direction) {
@@ -1286,10 +2232,21 @@ function cyclePanelSection(direction) {
 function handleReaderKeydown(event) {
   if (event.defaultPrevented) return;
   if (event.metaKey || event.ctrlKey || event.altKey) return;
+  // A dialog handles its own keys; Escape closes it.
+  if (document.querySelector('dialog[open]')) return;
 
+  // Escape closes what is open, the topmost first, and otherwise opens the menu.
   if (event.key === 'Escape') {
     event.preventDefault();
-    togglePanel();
+    if (!panelEl.classList.contains('hidden')) {
+      closePanel();
+    } else if (!bookEndEl.classList.contains('hidden')) {
+      showEnd(false);
+    } else if (!searchBarEl.classList.contains('hidden')) {
+      endSearch();
+    } else {
+      openPanel();
+    }
     return;
   }
 
@@ -1310,6 +2267,29 @@ function handleReaderKeydown(event) {
   if (event.key === 'Tab' && !panelEl.classList.contains('hidden')) {
     event.preventDefault();
     cyclePanelSection(event.shiftKey ? -1 : 1);
+    return;
+  }
+
+  // The rest are for reading, not for the menu over it.
+  if (!panelEl.classList.contains('hidden')) return;
+
+  // Back to where the last link was followed from, as the browser's Back does.
+  if (event.key === 'Backspace') {
+    event.preventDefault();
+    if (linkHistory.length) history.back();
+    return;
+  }
+
+  // Page-turn buttons send these; next is next whichever way the book reads.
+  if (event.key === 'PageDown') {
+    event.preventDefault();
+    goNextPage();
+    return;
+  }
+
+  if (event.key === 'PageUp') {
+    event.preventDefault();
+    goPrevPage();
     return;
   }
 
@@ -1345,6 +2325,13 @@ function handleViewerZoneClick(clientX, clientY) {
   const y = clientY - rect.top;
   log.debug('Viewer click at:', { x, y, width, height });
   if (x < 0 || y < 0 || x > width || y > height) return;
+  // A swipe that some browsers also report as a tap has already turned the page.
+  if (Date.now() - lastSwipeAt < SWIPE_CLICK_MS) return;
+  // Without a book, any tap is for the library.
+  if (!rendition) {
+    openPanel('library');
+    return;
+  }
 
   // Zones are configured for left-to-right books; mirror the grid for RTL,
   // so each action keeps its meaning and moves to the opposite side.
@@ -1370,6 +2357,13 @@ function handleViewerZoneClick(clientX, clientY) {
 
 function goNextPage() {
   if (!rendition || isTurningPage) return;
+  if (!bookEndEl.classList.contains('hidden')) return;
+  // epub.js has no page after the last one; the end screen is there instead.
+  if (rendition.location?.atEnd) {
+    showEnd(true);
+    return;
+  }
+  keptPlace = null;
   isTurningPage = true;
   rendition.next().catch(() => {
     isTurningPage = false;
@@ -1377,21 +2371,52 @@ function goNextPage() {
 }
 
 function goPrevPage() {
+  // Back from the end screen to the last page, which is still in place under it.
+  if (!bookEndEl.classList.contains('hidden')) {
+    showEnd(false);
+    return;
+  }
   if (!rendition || isTurningPage) return;
+  keptPlace = null;
   isTurningPage = true;
   rendition.prev().catch(() => {
     isTurningPage = false;
   });
 }
 
+function handleTouchStart(event) {
+  const touch = event.touches.length === 1 ? event.touches[0] : null;
+  // Screen coordinates, the same inside the book's frames as out of them.
+  touchStart = touch && { x: touch.screenX, y: touch.screenY };
+}
+
+function handleTouchEnd(event) {
+  const start = touchStart;
+  touchStart = null;
+  const touch = event.changedTouches[0];
+  if (!start || !touch || !rendition || !panelEl.classList.contains('hidden')) return;
+  const dx = touch.screenX - start.x;
+  const dy = touch.screenY - start.y;
+  if (Math.abs(dx) < SWIPE_DISTANCE || Math.abs(dx) < 2 * Math.abs(dy)) return;
+  lastSwipeAt = Date.now();
+  // Swiping left brings in the page on the right: the next one in a left-to-right book.
+  if ((dx < 0) !== isRTL) goNextPage(); else goPrevPage();
+}
+
 function handleRenditionContentPointer(event) {
   const target = event.target;
   if (!isDomElement(target)) return;
-  if (typeof target.closest === 'function' && target.closest('a[href]')) return;
 
   event.preventDefault?.();
   event.stopImmediatePropagation?.();
   event.stopPropagation?.();
+
+  // Caught on the way down, so epub.js's own link handling never sees the tap.
+  const link = typeof target.closest === 'function' ? target.closest('a[href]') : null;
+  if (link) {
+    handleBookLink(link);
+    return;
+  }
 
   // Event coordinates are relative to the iframe, which epub.js makes wider
   // than the viewer and shifts per page. Map them to the top-level viewport.
@@ -1461,70 +2486,18 @@ function updateChapterInfo(location) {
       return;
     }
     
-    // Try to find chapter name from TOC and highlight it
-    let chapterName = '';
-    let activeHref = null;
-    let currentChapterNum = '';
-    let totalChapters = 0;
-    
-    if (book?.navigation?.toc) {
-      // Count only TOP-LEVEL chapters
-      totalChapters = book.navigation.toc.filter(item => item.href).length;
-      
-      // Find current chapter with hierarchical numbering
-      const findInTocWithNumbers = (items, parentNum = '') => {
-        let chapterCount = 0;
-        for (const item of items) {
-          if (item.href) {
-            chapterCount++;
-            const currentNum = parentNum ? `${parentNum}.${chapterCount}` : `${chapterCount}`;
-            
-            if (section.href && section.href.includes(item.href.split('#')[0])) {
-              activeHref = item.href;
-              return {
-                name: item.label || item.title,
-                number: currentNum
-              };
-            }
-            
-            if (item.subitems) {
-              const found = findInTocWithNumbers(item.subitems, currentNum);
-              if (found) return found;
-            }
-          }
-        }
-        return null;
-      };
-      
-      const found = findInTocWithNumbers(book.navigation.toc);
-      if (found) {
-        chapterName = found.name;
-        currentChapterNum = found.number;
-      }
-    }
+    const entry = tocEntryFor(section.href);
     
     // Update active TOC item
-    if (tocListEl && activeHref) {
-      // Clear all active states
-      tocListEl.querySelectorAll('.tocItem.active').forEach(item => {
-        item.classList.remove('active');
-      });
-      // Set active state on matching item
-      const activeButton = [...tocListEl.querySelectorAll('.tocItem')].find((item) => item.dataset.href === activeHref);
-      if (activeButton) {
-        activeButton.classList.add('active');
-      }
+    if (tocListEl) {
+      tocListEl.querySelectorAll('.tocItem.active').forEach((item) => item.classList.remove('active'));
+      const index = entry ? tocEntries.indexOf(entry) : -1;
+      tocListEl.querySelector(`.tocItem[data-index="${index}"]`)?.classList.add('active');
     }
     
-    // Build chapter info display
+    // Chapter name, then the page within the chapter (no prefix)
     const parts = [];
-    
-    // Add chapter name
-    if (chapterName) {
-      parts.push(chapterName);
-    }
-    
-    // Add page within chapter (no prefix)
+    if (entry) parts.push(entry.title);
     const displayed = rendition?.location?.start?.displayed;
     if (displayed) {
       parts.push(`${displayed.page}/${displayed.total}`);
@@ -1532,11 +2505,10 @@ function updateChapterInfo(location) {
     
     chapterInfoEl.textContent = parts.filter(Boolean).join(' • ') || '•';
     
-    // Update chapter number in footer right (no prefix)
-    if (chapterNumberEl && currentChapterNum && totalChapters > 0) {
-      chapterNumberEl.textContent = `${currentChapterNum}/${totalChapters}`;
-    } else if (chapterNumberEl) {
-      chapterNumberEl.textContent = '-';
+    // Chapter number of the top-level count in footer right (no prefix)
+    const totalChapters = tocEntries.filter((item) => item.depth === 0 && item.number).length;
+    if (chapterNumberEl) {
+      chapterNumberEl.textContent = entry?.number && totalChapters > 0 ? `${entry.number}/${totalChapters}` : '-';
     }
   } catch (error) {
     log.debug('Failed to update chapter info:', error);
