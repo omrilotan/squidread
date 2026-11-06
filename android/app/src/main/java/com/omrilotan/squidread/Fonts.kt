@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.util.Log
 import android.util.LruCache
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -17,9 +18,12 @@ import org.readium.r2.navigator.preferences.FontFamily
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.util.AbsoluteUrl
 import org.readium.r2.shared.util.Url
+import org.readium.r2.shared.util.Try
 import org.readium.r2.shared.util.use
+import org.readium.r2.shared.util.content.ContentResolverError
 import org.readium.r2.shared.util.content.ContentResource
 import org.readium.r2.shared.util.data.Container
+import org.readium.r2.shared.util.data.ReadError
 import org.readium.r2.shared.util.resource.InMemoryResource
 import org.readium.r2.shared.util.resource.Resource
 
@@ -180,9 +184,31 @@ class Fonts(private val context: Context, private val prefs: ReaderPreferences) 
 		val face = files[name] ?: return null
 		bytes.get(name)?.let { return InMemoryResource(it) }
 		val size = face.size
-		if (size == null || size > MAX_CACHED_FONT_BYTES) return ContentResource(face.uri, context.contentResolver)
+		if (size == null || size > MAX_CACHED_FONT_BYTES) return GuardedResource(ContentResource(face.uri, context.contentResolver))
 		return InMemoryResource(sourceUrl = null, properties = Resource.Properties()) {
-			ContentResource(face.uri, context.contentResolver).use { it.read() }.onSuccess { bytes.put(name, it) }
+			GuardedResource(ContentResource(face.uri, context.contentResolver)).use { it.read() }.onSuccess { bytes.put(name, it) }
+		}
+	}
+
+	/**
+	 * A font file can disappear from the folder while a book is open. The documents provider then
+	 * throws IllegalArgumentException, which Readium doesn't catch, and on a web view thread that
+	 * ends the app. Here it becomes a failed read, and the book falls back to its own fonts.
+	 */
+	private class GuardedResource(private val resource: Resource) : Resource by resource {
+		override suspend fun properties() = guard { resource.properties() }
+
+		override suspend fun length() = guard { resource.length() }
+
+		override suspend fun read(range: LongRange?) = guard { resource.read(range) }
+
+		private inline fun <T> guard(block: () -> Try<T, ReadError>): Try<T, ReadError> = try {
+			block()
+		} catch (error: CancellationException) {
+			throw error
+		} catch (error: Exception) {
+			Log.w(TAG, "Cannot read a font file: ${error.javaClass.simpleName}")
+			Try.failure(ReadError.Access(ContentResolverError.FileNotFound(error)))
 		}
 	}
 

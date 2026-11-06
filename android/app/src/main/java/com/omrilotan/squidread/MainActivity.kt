@@ -83,6 +83,7 @@ import org.readium.r2.navigator.preferences.Color
 import org.readium.r2.navigator.preferences.FontFamily
 import org.readium.r2.navigator.preferences.ReadingProgression
 import org.readium.r2.navigator.preferences.Spread
+import org.readium.r2.navigator.preferences.TextAlign
 import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Layout
@@ -131,11 +132,12 @@ class MainActivity : AppCompatActivity() {
 	private lateinit var barScrims: List<View>
 	private lateinit var menuTitle: TextView
 	private lateinit var fontSizeValue: TextView
-	private lateinit var fontPicker: View
+	private lateinit var lineHeightValue: TextView
+	private lateinit var pageMarginsValue: TextView
+	private lateinit var justifyButtons: Map<Boolean?, TextView>
 	private lateinit var fontName: TextView
-	private lateinit var fontsMessage: TextView
-	private lateinit var fontsFolderButton: View
-	private lateinit var fontsHowToButton: View
+	private lateinit var fontPrevious: View
+	private lateinit var fontNext: View
 	private lateinit var tocList: RecyclerView
 	private lateinit var tocEmpty: TextView
 	private lateinit var searchRow: View
@@ -287,6 +289,7 @@ class MainActivity : AppCompatActivity() {
 		setUpWindow()
 		setUpMenu()
 		updateFontSizeLabel()
+		updateLayoutControls()
 
 		readerArea.onBackgroundTap = { x, y -> handleTap(x, y) }
 		readerArea.onKey = ::handlePageKey
@@ -546,12 +549,17 @@ class MainActivity : AppCompatActivity() {
 		progressView = findViewById(R.id.progress)
 		menu = findViewById(R.id.menu)
 		menuTitle = findViewById(R.id.menu_title)
-		fontSizeValue = findViewById(R.id.font_size_value)
-		fontPicker = findViewById(R.id.font_picker)
+		fontSizeValue = findViewById(R.id.font_reset)
+		lineHeightValue = findViewById(R.id.line_height_reset)
+		pageMarginsValue = findViewById(R.id.margins_reset)
+		justifyButtons = mapOf(
+			null to findViewById(R.id.justify_book),
+			true to findViewById(R.id.justify_on),
+			false to findViewById(R.id.justify_off),
+		)
 		fontName = findViewById(R.id.font_name)
-		fontsMessage = findViewById(R.id.fonts_message)
-		fontsFolderButton = findViewById(R.id.fonts_folder)
-		fontsHowToButton = findViewById(R.id.fonts_how_to)
+		fontPrevious = findViewById(R.id.font_previous)
+		fontNext = findViewById(R.id.font_next)
 		tocList = findViewById(R.id.toc_list)
 		tocEmpty = findViewById(R.id.toc_empty)
 		searchRow = findViewById(R.id.search_row)
@@ -589,17 +597,21 @@ class MainActivity : AppCompatActivity() {
 		findViewById<View>(R.id.font_decrease).setOnClickListener { changeFontSize(-ReaderPreferences.FONT_SIZE_STEP) }
 		findViewById<View>(R.id.font_increase).setOnClickListener { changeFontSize(ReaderPreferences.FONT_SIZE_STEP) }
 		findViewById<View>(R.id.font_reset).setOnClickListener { setFontSize(1.0) }
-		findViewById<View>(R.id.font_previous).setOnClickListener { cycleFont(-1) }
-		findViewById<View>(R.id.font_next).setOnClickListener { cycleFont(1) }
-		fontName.setOnClickListener { chooseFont() }
-		fontsHowToButton.setOnClickListener { openExternal(Uri.parse(getString(R.string.fonts_url))) }
-		fontsFolderButton.setOnClickListener {
-			try {
-				pickFontsFolder.launch(fonts.initialFolder)
-			} catch (error: ActivityNotFoundException) {
-				toast(R.string.open_failed)
-			}
+		findViewById<View>(R.id.line_height_decrease).setOnClickListener { changeLineHeight(-ReaderPreferences.LINE_HEIGHT_STEP) }
+		findViewById<View>(R.id.line_height_increase).setOnClickListener { changeLineHeight(ReaderPreferences.LINE_HEIGHT_STEP) }
+		lineHeightValue.setOnClickListener { setLineHeight(null) }
+		findViewById<View>(R.id.margins_decrease).setOnClickListener { changePageMargins(-ReaderPreferences.PAGE_MARGINS_STEP) }
+		findViewById<View>(R.id.margins_increase).setOnClickListener { changePageMargins(ReaderPreferences.PAGE_MARGINS_STEP) }
+		pageMarginsValue.setOnClickListener { setPageMargins(1.0) }
+		justifyButtons.forEach { (value, view) -> view.setOnClickListener { setJustify(value) } }
+		fontPrevious.setOnClickListener { cycleFont(-1) }
+		fontNext.setOnClickListener { cycleFont(1) }
+		// Without fonts, the middle button asks for the folder, also to replace an empty one.
+		fontName.setOnClickListener {
+			if (fonts.families.isNotEmpty()) chooseFont() else chooseFontsFolder()
 		}
+		// Tapping the book behind the menu goes back to it.
+		findViewById<View>(R.id.style_preview).setOnClickListener { closeMenu() }
 
 		tocList.layoutManager = LinearLayoutManager(this)
 		tocList.itemAnimator = null
@@ -1178,9 +1190,12 @@ class MainActivity : AppCompatActivity() {
 		return true
 	}
 
-	/** Whether the page the pager is showing has loaded; Readium hides it until then. */
+	/**
+	 * Whether the page the pager is showing has loaded; Readium hides it until then. Readium's
+	 * pager resumes only the page it shows, and holds the pages on either side at started.
+	 */
 	private fun isCurrentPageShowing(): Boolean {
-		val page = navigator?.childFragmentManager?.fragments?.firstOrNull { it.isMenuVisible } ?: return true
+		val page = navigator?.childFragmentManager?.fragments?.firstOrNull { it.isResumed } ?: return true
 		val webView = page.view?.let(::findWebView) ?: return true
 		return webView.isVisible
 	}
@@ -1227,6 +1242,12 @@ class MainActivity : AppCompatActivity() {
 		spread = Spread.NEVER,
 		scroll = false,
 		theme = if (isNight) Theme.DARK else Theme.LIGHT,
+		lineHeight = prefs.lineHeight,
+		pageMargins = prefs.pageMargins,
+		textAlign = prefs.justify?.let { if (it) TextAlign.JUSTIFY else TextAlign.START },
+		// Readium applies line spacing and alignment only over the book's own styles, and then also
+		// evens out the book's font sizes; so the book keeps its styles until either is chosen.
+		publisherStyles = if (prefs.lineHeight == null && prefs.justify == null) null else false,
 		// Maximum contrast for e-ink, whatever greys the book asks for.
 		textColor = Color(ContextCompat.getColor(this, R.color.ink)),
 		backgroundColor = Color(ContextCompat.getColor(this, R.color.paper)),
@@ -1748,8 +1769,56 @@ class MainActivity : AppCompatActivity() {
 		}
 	}
 
+	/** The reset button shows the size, like the line spacing and margin buttons. */
 	private fun updateFontSizeLabel() {
-		fontSizeValue.text = "${(prefs.fontSize * 100).roundToInt()}%"
+		val size = "${(prefs.fontSize * 100).roundToInt()}%"
+		fontSizeValue.setTextIfChanged(size)
+		ViewCompat.setStateDescription(fontSizeValue, size)
+	}
+
+	/** One step from the book's own line height starts from about Readium's default. */
+	private fun changeLineHeight(delta: Double) =
+		setLineHeight((prefs.lineHeight ?: ReaderPreferences.BOOK_LINE_HEIGHT) + delta)
+
+	/** Sets the line height, or null for the book's own. */
+	private fun setLineHeight(value: Double?) {
+		val height = value?.let {
+			((it * 10).roundToInt() / 10.0).coerceIn(ReaderPreferences.MIN_LINE_HEIGHT, ReaderPreferences.MAX_LINE_HEIGHT)
+		}
+		if (height == prefs.lineHeight) return
+		prefs.lineHeight = height
+		restyle()
+		updateLayoutControls()
+	}
+
+	private fun changePageMargins(delta: Double) = setPageMargins(prefs.pageMargins + delta)
+
+	private fun setPageMargins(value: Double) {
+		val margins = ((value * 10).roundToInt() / 10.0)
+			.coerceIn(ReaderPreferences.MIN_PAGE_MARGINS, ReaderPreferences.MAX_PAGE_MARGINS)
+		if (margins == prefs.pageMargins) return
+		prefs.pageMargins = margins
+		restyle()
+		updateLayoutControls()
+	}
+
+	/** Justifies the text (true), aligns it to the start (false), or leaves it to the book (null). */
+	private fun setJustify(value: Boolean?) {
+		if (value == prefs.justify) return
+		prefs.justify = value
+		restyle()
+		updateLayoutControls()
+	}
+
+	/** The line spacing and margin buttons show their values; tapping one goes back to the default. */
+	private fun updateLayoutControls() {
+		val lineHeight = prefs.lineHeight?.toString() ?: getString(R.string.style_book)
+		lineHeightValue.setTextIfChanged(lineHeight)
+		ViewCompat.setStateDescription(lineHeightValue, lineHeight)
+		val margins = "${(prefs.pageMargins * 100).roundToInt()}%"
+		pageMarginsValue.setTextIfChanged(margins)
+		ViewCompat.setStateDescription(pageMarginsValue, margins)
+		justifyButtons.forEach { (value, view) -> view.isSelected = value == prefs.justify }
 	}
 
 	/** Shows the fonts known so far right away, then again if listing the folder finds changes. */
@@ -1772,18 +1841,16 @@ class MainActivity : AppCompatActivity() {
 	private fun updateFontPicker() {
 		val families = fonts.families
 		val access = fonts.hasAccess()
-		fontPicker.isVisible = families.isNotEmpty()
-		fontName.setTextIfChanged(currentFontFamily() ?: getString(R.string.book_font))
-		val message = when {
-			!access -> getString(R.string.fonts_no_access)
-			families.isEmpty() -> getString(R.string.fonts_empty, fonts.folderName)
-			else -> null
-		}
-		fontsMessage.isVisible = message != null
-		message?.let { fontsMessage.setTextIfChanged(it) }
-		// Also offered for an empty folder, in case the wrong one was chosen.
-		fontsFolderButton.isVisible = families.isEmpty()
-		fontsHowToButton.isVisible = access && families.isEmpty()
+		fontName.setTextIfChanged(
+			when {
+				families.isNotEmpty() -> currentFontFamily() ?: getString(R.string.book_font)
+				access -> getString(R.string.fonts_empty, fonts.folderName)
+				else -> getString(R.string.fonts_allow)
+			},
+		)
+		// Nothing to step through without fonts.
+		fontPrevious.isEnabled = families.isNotEmpty()
+		fontNext.isEnabled = families.isNotEmpty()
 	}
 
 	private fun cycleFont(step: Int) {
@@ -1801,7 +1868,17 @@ class MainActivity : AppCompatActivity() {
 				dialog.dismiss()
 				setFontFamily(options[which])
 			}
+			.setNeutralButton(R.string.fonts_change) { _, _ -> chooseFontsFolder() }
 			.show()
+	}
+
+	/** Opens the folder picker, at the current fonts folder when there is one. */
+	private fun chooseFontsFolder() {
+		try {
+			pickFontsFolder.launch(fonts.folder ?: fonts.initialFolder)
+		} catch (error: ActivityNotFoundException) {
+			toast(R.string.open_failed)
+		}
 	}
 
 	private fun setFontFamily(family: String?) {

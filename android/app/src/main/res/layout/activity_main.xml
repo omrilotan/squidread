@@ -549,7 +549,7 @@
       android:layout_weight="1">
 
       <!-- A see-through window onto the book behind the menu, to preview font size changes.
-           The menu consumes touches, so the book can't be operated through it. -->
+           The menu consumes touches, so the book can't be operated through it; a tap closes the menu. -->
       <LinearLayout
         android:id="@+id/section_styles"
         android:layout_width="match_parent"
@@ -558,152 +558,302 @@
 
         <!-- One view, not a row of strips: paper around a framed see-through window. -->
         <View
+          android:id="@+id/style_preview"
           android:layout_width="match_parent"
           android:layout_height="0dp"
           android:layout_weight="1"
           android:background="@drawable/preview_frame"
           android:importantForAccessibility="no" />
 
-        <LinearLayout
+        <!-- Scrolls only when the controls don't fit, as on a small screen held sideways. -->
+        <ScrollView
           android:layout_width="match_parent"
           android:layout_height="wrap_content"
           android:background="@color/paper"
-          android:gravity="center"
-          android:orientation="vertical"
-          android:paddingBottom="16dp">
-
-          <TextView
-            style="@style/Squidread.Heading"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:paddingTop="12dp"
-            android:text="@string/font_size" />
+          android:overScrollMode="never"
+          android:scrollbars="none">
 
           <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:baselineAligned="false"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-              android:id="@+id/font_decrease"
-              style="@style/Squidread.Button"
-              android:layout_width="64dp"
-              android:layout_height="wrap_content"
-              android:text="@string/minus_symbol"
-              android:textSize="22sp" />
-
-            <TextView
-              android:id="@+id/font_reset"
-              style="@style/Squidread.Button"
-              android:layout_width="wrap_content"
-              android:layout_height="wrap_content"
-              android:layout_marginStart="-2dp"
-              android:layout_marginEnd="-2dp"
-              android:minWidth="96dp"
-              android:text="@string/font_reset" />
-
-            <TextView
-              android:id="@+id/font_increase"
-              style="@style/Squidread.Button"
-              android:layout_width="64dp"
-              android:layout_height="wrap_content"
-              android:text="@string/plus_symbol"
-              android:textSize="22sp" />
-          </LinearLayout>
-
-          <TextView
-            android:id="@+id/font_size_value"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:paddingTop="8dp"
-            android:textColor="@color/ink"
-            android:textSize="16sp" />
-
-          <TextView
-            style="@style/Squidread.Heading"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:paddingTop="12dp"
-            android:text="@string/font" />
-
-          <LinearLayout
-            android:id="@+id/font_picker"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:baselineAligned="false"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp">
-
-            <TextView
-              android:id="@+id/font_previous"
-              style="@style/Squidread.Button"
-              android:layout_width="64dp"
-              android:layout_height="wrap_content"
-              android:contentDescription="@string/font_previous"
-              android:text="@string/previous_symbol"
-              android:textSize="22sp" />
-
-            <TextView
-              android:id="@+id/font_name"
-              style="@style/Squidread.Button"
-              android:layout_width="0dp"
-              android:layout_height="wrap_content"
-              android:layout_marginStart="-2dp"
-              android:layout_marginEnd="-2dp"
-              android:layout_weight="1"
-              android:ellipsize="end"
-              android:maxLines="1" />
-
-            <TextView
-              android:id="@+id/font_next"
-              style="@style/Squidread.Button"
-              android:layout_width="64dp"
-              android:layout_height="wrap_content"
-              android:contentDescription="@string/font_next"
-              android:text="@string/next_symbol"
-              android:textSize="22sp" />
-          </LinearLayout>
-
-          <TextView
-            android:id="@+id/fonts_message"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
             android:gravity="center"
-            android:paddingStart="16dp"
-            android:paddingTop="4dp"
-            android:paddingEnd="16dp"
-            android:textColor="@color/ink"
-            android:textSize="15sp"
-            android:visibility="gone" />
+            android:orientation="vertical"
+            android:paddingBottom="8dp">
 
-          <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:orientation="horizontal">
+<!-- Font size, line spacing and margins in one row. Each middle button shows the value;
+                 tapping it goes back to the default. -->
+            <LinearLayout
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:baselineAligned="false"
+              android:orientation="horizontal"
+              android:paddingStart="16dp"
+              android:paddingEnd="16dp">
+
+              <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                  style="@style/Squidread.Heading.Compact"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:maxLines="1"
+                  android:text="@string/font_size" />
+
+                <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:baselineAligned="false"
+                  android:orientation="horizontal">
+
+                  <TextView
+                    android:id="@+id/font_decrease"
+                    style="@style/Squidread.Button"
+                    android:layout_width="44dp"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/font_size_smaller"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:text="@string/minus_symbol"
+                    android:textSize="22sp" />
+
+                  <TextView
+                    android:id="@+id/font_reset"
+                    style="@style/Squidread.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="-2dp"
+                    android:layout_marginEnd="-2dp"
+                    android:layout_weight="1"
+                    android:contentDescription="@string/font_size_reset"
+                    android:maxLines="1"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp" />
+
+                  <TextView
+                    android:id="@+id/font_increase"
+                    style="@style/Squidread.Button"
+                    android:layout_width="44dp"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/font_size_larger"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:text="@string/plus_symbol"
+                    android:textSize="22sp" />
+                </LinearLayout>
+              </LinearLayout>
+
+              <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                  style="@style/Squidread.Heading.Compact"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:maxLines="1"
+                  android:text="@string/line_spacing" />
+
+                <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:baselineAligned="false"
+                  android:orientation="horizontal">
+
+                  <TextView
+                    android:id="@+id/line_height_decrease"
+                    style="@style/Squidread.Button"
+                    android:layout_width="44dp"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/line_spacing_less"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:text="@string/minus_symbol"
+                    android:textSize="22sp" />
+
+                  <TextView
+                    android:id="@+id/line_height_reset"
+                    style="@style/Squidread.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="-2dp"
+                    android:layout_marginEnd="-2dp"
+                    android:layout_weight="1"
+                    android:contentDescription="@string/line_spacing_reset"
+                    android:maxLines="1"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp" />
+
+                  <TextView
+                    android:id="@+id/line_height_increase"
+                    style="@style/Squidread.Button"
+                    android:layout_width="44dp"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/line_spacing_more"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:text="@string/plus_symbol"
+                    android:textSize="22sp" />
+                </LinearLayout>
+              </LinearLayout>
+
+              <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                  style="@style/Squidread.Heading.Compact"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:maxLines="1"
+                  android:text="@string/margins" />
+
+                <LinearLayout
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:baselineAligned="false"
+                  android:orientation="horizontal">
+
+                  <TextView
+                    android:id="@+id/margins_decrease"
+                    style="@style/Squidread.Button"
+                    android:layout_width="44dp"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/margins_narrower"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:text="@string/minus_symbol"
+                    android:textSize="22sp" />
+
+                  <TextView
+                    android:id="@+id/margins_reset"
+                    style="@style/Squidread.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="-2dp"
+                    android:layout_marginEnd="-2dp"
+                    android:layout_weight="1"
+                    android:contentDescription="@string/margins_reset"
+                    android:maxLines="1"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp" />
+
+                  <TextView
+                    android:id="@+id/margins_increase"
+                    style="@style/Squidread.Button"
+                    android:layout_width="44dp"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/margins_wider"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:text="@string/plus_symbol"
+                    android:textSize="22sp" />
+                </LinearLayout>
+              </LinearLayout>
+            </LinearLayout>
 
             <TextView
-              android:id="@+id/fonts_folder"
-              style="@style/Squidread.Button"
+              style="@style/Squidread.Heading.Compact"
               android:layout_width="wrap_content"
               android:layout_height="wrap_content"
-              android:text="@string/fonts_allow"
-              android:visibility="gone" />
+              android:text="@string/font" />
+
+            <!-- The middle button names the font, or, without fonts, asks for the folder. -->
+            <LinearLayout
+              android:id="@+id/font_picker"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:baselineAligned="false"
+              android:gravity="center_vertical"
+              android:orientation="horizontal"
+              android:paddingStart="16dp"
+              android:paddingEnd="16dp">
+
+              <TextView
+                android:id="@+id/font_previous"
+                style="@style/Squidread.Button"
+                android:layout_width="64dp"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/font_previous"
+                android:text="@string/previous_symbol"
+                android:textSize="22sp" />
+
+              <TextView
+                android:id="@+id/font_name"
+                style="@style/Squidread.Button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="-2dp"
+                android:layout_marginEnd="-2dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1" />
+
+              <TextView
+                android:id="@+id/font_next"
+                style="@style/Squidread.Button"
+                android:layout_width="64dp"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/font_next"
+                android:text="@string/next_symbol"
+                android:textSize="22sp" />
+            </LinearLayout>
 
             <TextView
-              android:id="@+id/fonts_how_to"
-              style="@style/Squidread.Button"
+              style="@style/Squidread.Heading.Compact"
               android:layout_width="wrap_content"
               android:layout_height="wrap_content"
-              android:layout_marginStart="8dp"
-              android:text="@string/fonts_how_to"
-              android:visibility="gone" />
+              android:text="@string/justify" />
+
+            <!-- Segmented, like the theme buttons: neighbours overlap and share a border. -->
+            <LinearLayout
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:baselineAligned="false"
+              android:orientation="horizontal"
+              android:paddingStart="16dp"
+              android:paddingEnd="16dp">
+
+              <TextView
+                android:id="@+id/justify_book"
+                style="@style/Squidread.Button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/style_book" />
+
+              <TextView
+                android:id="@+id/justify_on"
+                style="@style/Squidread.Button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="-2dp"
+                android:layout_marginEnd="-2dp"
+                android:layout_weight="1"
+                android:text="@string/justify_on" />
+
+              <TextView
+                android:id="@+id/justify_off"
+                style="@style/Squidread.Button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/justify_off" />
+            </LinearLayout>
           </LinearLayout>
-        </LinearLayout>
+        </ScrollView>
       </LinearLayout>
 
       <!-- The note says why the list is empty, or, for a book without contents, what it lists instead. -->

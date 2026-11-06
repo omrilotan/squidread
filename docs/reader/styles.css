@@ -238,7 +238,7 @@ button:disabled:active {
   text-align: center;
 }
 
-/* --- Aa: font size ----------------------------------------------------------- */
+/* --- Aa: reading styles ------------------------------------------------------ */
 
 #stylesSection {
   padding: 0;
@@ -258,28 +258,78 @@ button:disabled:active {
 
 .stylesControls {
   position: relative;
-  padding: 0 var(--gap) var(--gap);
+  padding: 0 var(--gap) 8px;
   background: var(--paper);
   text-align: center;
 }
 
-.fontSizeControl {
-  max-width: 300px;
-  margin: 0 auto;
+/* Font size, line spacing and margins side by side, each − value +. */
+.steppers {
+  display: flex;
+  gap: 8px;
 }
 
-.fontSizeControl > button {
+.stepper {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.stylesControls h3 {
+  margin: 8px 0 4px;
+  overflow: hidden;
+  font-size: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The side buttons give way on a phone, so the value between them still fits. */
+.stepper > .segmented > button {
+  flex: 0 0 clamp(32px, 9vw, 44px);
+  padding: 0;
   font-size: 22px;
 }
 
-.fontSizeControl > button.wide {
-  flex-grow: 1.5;
+.stepper > .segmented > .stepperValue {
+  flex: 1 1 0;
   font-size: inherit;
+  font-variant-numeric: tabular-nums;
 }
 
-.fontSizeValue {
-  margin: 12px 0 0;
-  font-variant-numeric: tabular-nums;
+@media (max-width: 380px) {
+  .stepper > .segmented > .stepperValue {
+    font-size: 14px;
+  }
+}
+
+.fontPicker > button {
+  flex: 0 0 64px;
+  font-size: 22px;
+}
+
+.fontPicker > .fontName {
+  flex: 1 1 0;
+  overflow: hidden;
+  font-size: inherit;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fontList {
+  margin: 0 0 var(--gap);
+  padding: 0;
+  list-style: none;
+}
+
+.fontList button {
+  justify-content: flex-start;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fontList li + li button {
+  margin-top: calc(-1 * var(--line));
 }
 
 /* --- Contents ---------------------------------------------------------------- */

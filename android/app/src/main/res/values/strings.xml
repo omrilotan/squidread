@@ -21,15 +21,28 @@
   <string name="opening">Opening…</string>
   <string name="add_epub">+ Add EPUB</string>
   <string name="font_size">Font size</string>
-  <string name="font_reset">Reset</string>
+  <string name="font_size_reset">Reset font size</string>
+  <string name="font_size_smaller">Smaller font</string>
+  <string name="font_size_larger">Larger font</string>
   <string name="font">Font</string>
   <string name="book_font">Book font</string>
   <string name="font_previous">Previous font</string>
   <string name="font_next">Next font</string>
-  <string name="fonts_empty">No fonts in the %1$s folder yet. Put .ttf or .otf files there, for example Noto Serif, free from Google Fonts.</string>
-  <string name="fonts_how_to">How to</string>
-  <string name="fonts_no_access">To use your own fonts, put them in the fonts folder on your device and let Squidread read it.</string>
+  <string name="style_book">Book</string>
+  <string name="line_spacing">Line spacing</string>
+  <string name="line_spacing_less">Less line spacing</string>
+  <string name="line_spacing_more">More line spacing</string>
+  <string name="line_spacing_reset">Reset line spacing</string>
+  <string name="margins">Margins</string>
+  <string name="margins_narrower">Narrower margins</string>
+  <string name="margins_wider">Wider margins</string>
+  <string name="margins_reset">Reset margins</string>
+  <string name="justify">Justify</string>
+  <string name="justify_on">On</string>
+  <string name="justify_off">Off</string>
+  <string name="fonts_empty">No fonts in %1$s</string>
   <string name="fonts_allow">Choose fonts folder</string>
+  <string name="fonts_change">Change folder</string>
   <string name="no_contents">Open a book to see its table of contents.</string>
   <string name="no_toc">This book has no table of contents.</string>
   <string name="toc_sections">This book has no table of contents. Its sections, in order:</string>
@@ -86,7 +99,6 @@
   <string name="previous_symbol" translatable="false">‹</string>
   <string name="next_symbol" translatable="false">›</string>
   <string name="website_url" translatable="false">https://omrilotan.com/squidread/</string>
-  <string name="fonts_url" translatable="false">https://omrilotan.com/squidread/fonts/</string>
   <string name="gutenberg_example_url" translatable="false">https://www.gutenberg.org/ebooks/345.epub3.images</string>
   <string name="gutenberg_url" translatable="false">https://www.gutenberg.org/ebooks/search/?sort_order=downloads</string>
   <string name="privacy_url" translatable="false">https://omrilotan.com/squidread/privacy/</string>

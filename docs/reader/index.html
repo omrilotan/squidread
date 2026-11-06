@@ -72,6 +72,20 @@
     </div>
   </dialog>
 
+  <!-- The fonts from the folder, to pick one by name, and a way to read another folder. -->
+  <dialog id="fontDialog" class="dialog">
+    <div class="dialogContent">
+      <button id="fontDialogClose" class="dialogClose" aria-label="Close">✕</button>
+      <h2>Font</h2>
+      <ul id="fontList" class="fontList"></ul>
+      <div class="dialogButtons">
+        <button id="fontsChange">Change folder</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Reads every font in a chosen folder; the browser keeps copies, not the folder itself. -->
+  <input type="file" id="fontsPicker" webkitdirectory multiple class="hidden" />
   <input type="file" id="filePicker" accept="application/epub+zip,.epub" class="hidden" />
 
   <main class="layout">
@@ -117,16 +131,49 @@
         </section>
 
         <section id="stylesSection" class="panelSection active">
-          <!-- A framed window onto the page, so font size changes show as they're made. -->
-          <div class="stylesPreview" aria-hidden="true"></div>
+          <!-- A framed window onto the page, so changes show as they're made. A tap on it goes back to the book. -->
+          <div id="stylesPreview" class="stylesPreview" aria-hidden="true"></div>
           <div class="stylesControls">
-            <h3>Font size</h3>
-            <div class="segmented fontSizeControl">
-              <button id="fontSizeDecrease" title="Decrease font size" aria-label="Decrease font size">−</button>
-              <button id="fontSizeReset" class="wide" title="Reset font size">Reset</button>
-              <button id="fontSizeIncrease" title="Increase font size" aria-label="Increase font size">+</button>
+            <!-- Each middle button shows the value; tapping it goes back to the default. -->
+            <div class="steppers">
+              <div class="stepper">
+                <h3>Font size</h3>
+                <div class="segmented">
+                  <button id="fontSizeDecrease" type="button" title="Smaller font" aria-label="Smaller font">−</button>
+                  <button id="fontSizeReset" type="button" class="stepperValue" title="Reset font size"></button>
+                  <button id="fontSizeIncrease" type="button" title="Larger font" aria-label="Larger font">+</button>
+                </div>
+              </div>
+              <div class="stepper">
+                <h3>Line spacing</h3>
+                <div class="segmented">
+                  <button id="lineHeightDecrease" type="button" title="Less line spacing" aria-label="Less line spacing">−</button>
+                  <button id="lineHeightReset" type="button" class="stepperValue" title="Reset line spacing"></button>
+                  <button id="lineHeightIncrease" type="button" title="More line spacing" aria-label="More line spacing">+</button>
+                </div>
+              </div>
+              <div class="stepper">
+                <h3>Margins</h3>
+                <div class="segmented">
+                  <button id="marginsDecrease" type="button" title="Narrower margins" aria-label="Narrower margins">−</button>
+                  <button id="marginsReset" type="button" class="stepperValue" title="Reset margins"></button>
+                  <button id="marginsIncrease" type="button" title="Wider margins" aria-label="Wider margins">+</button>
+                </div>
+              </div>
             </div>
-            <p id="fontSizeValue" class="fontSizeValue">100%</p>
+            <h3>Font</h3>
+            <!-- The middle button names the font, or, without fonts, asks for the folder. -->
+            <div class="segmented fontPicker">
+              <button id="fontPrevious" type="button" title="Previous font" aria-label="Previous font">‹</button>
+              <button id="fontName" type="button" class="fontName"></button>
+              <button id="fontNext" type="button" title="Next font" aria-label="Next font">›</button>
+            </div>
+            <h3>Justify</h3>
+            <div class="segmented" role="radiogroup" aria-label="Justify">
+              <button type="button" data-justify="book" aria-pressed="false">Book</button>
+              <button type="button" data-justify="on" aria-pressed="false">On</button>
+              <button type="button" data-justify="off" aria-pressed="false">Off</button>
+            </div>
           </div>
         </section>
 

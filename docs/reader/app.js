@@ -330,9 +330,11 @@ function wireReaderAspectControls() {
 
 (async function init() {
   log.info('App init start');
-  db = await openDB('squidread', 1, {
-    upgrade(upgradeDB) {
-      upgradeDB.createObjectStore('books', { keyPath: 'id' });
+  db = await openDB('squidread', 2, {
+    upgrade(upgradeDB, oldVersion) {
+      if (oldVersion < 1) upgradeDB.createObjectStore('books', { keyPath: 'id' });
+      // Copies of the font files from the chosen folder.
+      if (oldVersion < 2) upgradeDB.createObjectStore('fonts', { keyPath: 'name' });
     },
   });
 
@@ -343,6 +345,8 @@ function wireReaderAspectControls() {
   const savedFontSize = parseFloat(localStorage.getItem('squidreadFontSize'));
   if (savedFontSize > 0) currentFontSize = savedFontSize;
   applyFontSize();
+  loadReadingStyles();
+  await loadFonts();
   await renderLibrary();
   await refreshEmptyState();
 
@@ -422,6 +426,9 @@ function wireEvents() {
   document.getElementById('fontSizeDecrease')?.addEventListener('click', () => adjustFontSize(-0.1));
   document.getElementById('fontSizeReset')?.addEventListener('click', () => resetFontSize());
   document.getElementById('fontSizeIncrease')?.addEventListener('click', () => adjustFontSize(0.1));
+  wireReadingStyleEvents();
+  // A tap on the page behind the menu goes back to it.
+  document.getElementById('stylesPreview')?.addEventListener('click', () => closePanel());
 
   // Wire up the Add EPUB buttons to open file picker
   document.getElementById('addEpubBtn')?.addEventListener('click', () => filePicker.click());
@@ -1873,6 +1880,7 @@ function resizeRendition() {
   const height = Math.min(window.innerHeight, Math.floor(rect.height));
   if (width > 0 && height > 0) {
     fixedViewerHeight = height;
+    if (rendition.manager) rendition.manager.settings.gap = pageGap(width);
     rendition.resize(width, height);
   }
 }
@@ -1987,6 +1995,7 @@ async function loadBook(id) {
     width: '100%',
     height: '100%',
     spread: 'none',
+    gap: pageGap(viewerEl.getBoundingClientRect().width),
     // Books' own scripts stay off: their pages share the reader's origin, so a script could
     // read every stored book, change the reader, or replace its offline copy.
     allowScriptedContent: false,
@@ -2005,6 +2014,7 @@ async function loadBook(id) {
         doc.addEventListener('touchend', handleTouchEnd);
       }
       fitImagePages(doc);
+      applyReadingStyles(contents);
       markContents(contents);
     } catch (error) {
       log.debug('Failed to bind rendition content hooks:', error);
@@ -2128,13 +2138,327 @@ function restorePlace(tries) {
 }
 
 function applyFontSize() {
-  const fontSizeValueEl = document.getElementById('fontSizeValue');
+  const fontSizeValueEl = document.getElementById('fontSizeReset');
   if (fontSizeValueEl) fontSizeValueEl.textContent = `${Math.round(currentFontSize * 100)}%`;
   if (!rendition) return;
   
   // Apply font size to the book's body element
   rendition.themes.fontSize(`${currentFontSize}em`);
   log.debug(`Font size adjusted to ${currentFontSize}em`);
+}
+
+// --- Aa: line spacing, margins, justification and fonts ----------------------
+
+const MIN_LINE_HEIGHT = 1.0;
+const MAX_LINE_HEIGHT = 2.0;
+const LINE_HEIGHT_STEP = 0.1;
+// Where the first step from the book's own line height starts.
+const BOOK_LINE_HEIGHT = 1.5;
+const MIN_PAGE_MARGINS = 0;
+const MAX_PAGE_MARGINS = 3;
+const PAGE_MARGINS_STEP = 0.5;
+const JUSTIFY_MODES = ['book', 'on', 'off'];
+const FONT_EXTENSIONS = new Set(['ttf', 'otf', 'woff', 'woff2']);
+const FONT_WEIGHTS = {
+  thin: 100, hairline: 100, extralight: 200, ultralight: 200, light: 300, regular: 400, normal: 400, book: 400,
+  medium: 500, semibold: 600, demibold: 600, bold: 700, extrabold: 800, ultrabold: 800, black: 900, heavy: 900,
+};
+// `Family-BoldItalic`, `Family_Light`, `Family Bold Italic`; anything else is a regular face.
+const STYLED_FONT_NAME = new RegExp(
+  `^(.+?)[-_ ](${Object.keys(FONT_WEIGHTS).sort((a, b) => b.length - a.length).join('|')})?(?:[-_ ]?(italic|oblique))?$`,
+  'i',
+);
+const READING_STYLES_ID = 'squidread-reading-styles';
+
+// Null for the book's own line height; a multiple of the font size otherwise.
+let lineHeight = null;
+// A factor for the space beside the text; 1 is epub.js's own.
+let pageMargins = 1;
+let justify = 'book';
+// A family from the fonts folder; null for the book's own fonts.
+let fontFamily = null;
+// The faces read from the folder: { name, family, weight, italic, blob }.
+let fontFaces = [];
+let fontFamilies = [];
+// The folder's name, once one has been chosen.
+let fontsFolder = null;
+let fontFaceCss = null;
+let fontUrls = [];
+
+function loadReadingStyles() {
+  const storedLineHeight = parseFloat(localStorage.getItem('squidreadLineHeight'));
+  lineHeight = storedLineHeight >= MIN_LINE_HEIGHT && storedLineHeight <= MAX_LINE_HEIGHT ? tenths(storedLineHeight) : null;
+  const storedMargins = parseFloat(localStorage.getItem('squidreadMargins'));
+  pageMargins = storedMargins >= MIN_PAGE_MARGINS && storedMargins <= MAX_PAGE_MARGINS ? tenths(storedMargins) : 1;
+  const storedJustify = localStorage.getItem('squidreadJustify');
+  justify = JUSTIFY_MODES.includes(storedJustify) ? storedJustify : 'book';
+  fontFamily = localStorage.getItem('squidreadFontFamily');
+  fontsFolder = localStorage.getItem('squidreadFontsFolder');
+  updateLayoutControls();
+}
+
+function wireReadingStyleEvents() {
+  document.getElementById('lineHeightDecrease').addEventListener('click', () => setLineHeight((lineHeight ?? BOOK_LINE_HEIGHT) - LINE_HEIGHT_STEP));
+  document.getElementById('lineHeightIncrease').addEventListener('click', () => setLineHeight((lineHeight ?? BOOK_LINE_HEIGHT) + LINE_HEIGHT_STEP));
+  document.getElementById('lineHeightReset').addEventListener('click', () => setLineHeight(null));
+  document.getElementById('marginsDecrease').addEventListener('click', () => setPageMargins(pageMargins - PAGE_MARGINS_STEP));
+  document.getElementById('marginsIncrease').addEventListener('click', () => setPageMargins(pageMargins + PAGE_MARGINS_STEP));
+  document.getElementById('marginsReset').addEventListener('click', () => setPageMargins(1));
+  document.querySelectorAll('[data-justify]').forEach((button) => {
+    button.addEventListener('click', () => setJustify(button.dataset.justify));
+  });
+  document.getElementById('fontPrevious').addEventListener('click', () => cycleFont(-1));
+  document.getElementById('fontNext').addEventListener('click', () => cycleFont(1));
+  // Without fonts, the middle button asks for the folder, also to replace an empty one.
+  document.getElementById('fontName').addEventListener('click', () => {
+    if (fontFamilies.length) chooseFont();
+    else chooseFontsFolder();
+  });
+  document.getElementById('fontDialogClose').addEventListener('click', () => document.getElementById('fontDialog').close());
+  document.getElementById('fontsChange').addEventListener('click', () => {
+    document.getElementById('fontDialog').close();
+    chooseFontsFolder();
+  });
+  document.getElementById('fontsPicker').addEventListener('change', (event) => {
+    const files = [...(event.target.files || [])];
+    event.target.value = '';
+    readFontsFolder(files).catch((error) => log.warn('Could not read the fonts folder:', error));
+  });
+}
+
+/** Stored as text, so 1.6 can come back as 1.6000000000000003 without rounding. */
+function tenths(value) {
+  return Math.round(value * 10) / 10;
+}
+
+function setLineHeight(value) {
+  const height = value === null ? null : Math.max(MIN_LINE_HEIGHT, Math.min(MAX_LINE_HEIGHT, tenths(value)));
+  if (height === lineHeight) return;
+  lineHeight = height;
+  if (height === null) localStorage.removeItem('squidreadLineHeight');
+  else localStorage.setItem('squidreadLineHeight', String(height));
+  restyle();
+}
+
+function setPageMargins(value) {
+  const margins = Math.max(MIN_PAGE_MARGINS, Math.min(MAX_PAGE_MARGINS, tenths(value)));
+  if (margins === pageMargins) return;
+  pageMargins = margins;
+  localStorage.setItem('squidreadMargins', String(margins));
+  updateLayoutControls();
+  if (!rendition?.manager) return;
+  keepPlace();
+  // epub.js lays the page out again only when its size changes.
+  rendition.manager._stageSize = undefined;
+  resizeRendition();
+  lockIframeHeight();
+  restorePlace(KEEP_PLACE_TRIES);
+}
+
+function setJustify(value) {
+  if (value === justify) return;
+  justify = value;
+  if (value === 'book') localStorage.removeItem('squidreadJustify');
+  else localStorage.setItem('squidreadJustify', value);
+  restyle();
+}
+
+function setFontFamily(family) {
+  if (family === currentFontFamily()) return;
+  fontFamily = family;
+  if (family === null) localStorage.removeItem('squidreadFontFamily');
+  else localStorage.setItem('squidreadFontFamily', family);
+  restyle();
+}
+
+/** The space beside the text, even so the columns line up: epub.js's own times the setting. */
+function pageGap(width) {
+  const own = Math.floor(width / 12);
+  const gap = Math.round((own - (own % 2)) * pageMargins);
+  return Math.max(0, gap - (gap % 2));
+}
+
+/** Keeps the words on the page for the layout change that follows, as a font size change does. */
+function keepPlace() {
+  keptPlace ??= rendition?.currentLocation?.()?.start?.cfi || null;
+}
+
+function restyle() {
+  updateLayoutControls();
+  if (!rendition) return;
+  keepPlace();
+  rendition.getContents().forEach(applyReadingStyles);
+  restorePlace(KEEP_PLACE_TRIES);
+}
+
+/** The middle buttons show their values; tapping one goes back to the default. */
+function updateLayoutControls() {
+  document.getElementById('lineHeightReset').textContent = lineHeight === null ? 'Book' : lineHeight.toFixed(1);
+  document.getElementById('marginsReset').textContent = `${Math.round(pageMargins * 100)}%`;
+  document.querySelectorAll('[data-justify]').forEach((button) => {
+    button.setAttribute('aria-pressed', button.dataset.justify === justify ? 'true' : 'false');
+  });
+  updateFontPicker();
+}
+
+/** One style element per page, rewritten on every change. */
+function applyReadingStyles(contents) {
+  const doc = contents?.document;
+  if (!doc?.head) return;
+  let style = doc.getElementById(READING_STYLES_ID);
+  if (!style) {
+    style = doc.createElement('style');
+    style.id = READING_STYLES_ID;
+    doc.head.appendChild(style);
+  }
+  const css = readingCss();
+  if (style.textContent !== css) style.textContent = css;
+}
+
+function readingCss() {
+  const rules = [];
+  if (lineHeight !== null) {
+    rules.push(`html body, html body * { line-height: ${lineHeight} !important; }`);
+  }
+  if (justify !== 'book') {
+    const align = justify === 'on' ? 'justify' : 'start';
+    rules.push(`html body, html body p, html body li, html body dd, html body blockquote { text-align: ${align} !important; }`);
+  }
+  const family = currentFontFamily();
+  if (family) {
+    rules.push(fontFacesCss());
+    // Code keeps its own font, so its columns still line up.
+    rules.push(`html body, html body *:not(pre):not(code):not(kbd):not(samp):not(tt) { font-family: "${family}" !important; }`);
+  }
+  return rules.join('\n');
+}
+
+/** Made once per visit: blob addresses for every face, which the book's pages share. */
+function fontFacesCss() {
+  fontFaceCss ??= fontFaces.map((face) => `@font-face {
+  font-family: "${face.family}";
+  src: url("${fontUrl(face.blob)}");
+  font-weight: ${face.weight};
+  font-style: ${face.italic ? 'italic' : 'normal'};
+}`).join('\n');
+  return fontFaceCss;
+}
+
+function fontUrl(blob) {
+  const url = URL.createObjectURL(blob);
+  fontUrls.push(url);
+  return url;
+}
+
+/** The family in use: null for the book's own fonts, or when the chosen one is gone. */
+function currentFontFamily() {
+  return fontFamily && fontFamilies.includes(fontFamily) ? fontFamily : null;
+}
+
+function updateFontPicker() {
+  const name = document.getElementById('fontName');
+  if (!name) return;
+  let label;
+  if (fontFamilies.length) label = currentFontFamily() ?? 'Book font';
+  else if (fontsFolder !== null) label = fontsFolder ? `No fonts in ${fontsFolder}` : 'No fonts in that folder';
+  else label = 'Choose fonts folder';
+  name.textContent = label;
+  name.title = label;
+  // Nothing to step through without fonts.
+  document.getElementById('fontPrevious').disabled = !fontFamilies.length;
+  document.getElementById('fontNext').disabled = !fontFamilies.length;
+}
+
+function cycleFont(step) {
+  const options = [null, ...fontFamilies];
+  const index = options.indexOf(currentFontFamily());
+  setFontFamily(options[(index + step + options.length) % options.length]);
+}
+
+function chooseFont() {
+  const dialog = document.getElementById('fontDialog');
+  const list = document.getElementById('fontList');
+  const current = currentFontFamily();
+  list.replaceChildren(...[null, ...fontFamilies].map((family) => {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = family ?? 'Book font';
+    button.setAttribute('aria-pressed', family === current ? 'true' : 'false');
+    button.addEventListener('click', () => {
+      dialog.close();
+      setFontFamily(family);
+    });
+    item.appendChild(button);
+    return item;
+  }));
+  dialog.showModal();
+  list.querySelector('[aria-pressed="true"]')?.focus();
+}
+
+function chooseFontsFolder() {
+  document.getElementById('fontsPicker').click();
+}
+
+/** A face from a file's name, as the app reads it: `Literata-BoldItalic.ttf` is bold italic Literata. */
+function fontFace(fileName) {
+  const dot = fileName.lastIndexOf('.');
+  if (dot < 0 || !FONT_EXTENSIONS.has(fileName.slice(dot + 1).toLowerCase())) return null;
+  const base = fileName.slice(0, dot);
+  const match = base.match(STYLED_FONT_NAME);
+  const weight = (match?.[2] || '').toLowerCase();
+  const italic = Boolean(match?.[3]);
+  // The name goes into CSS; keep it to characters that need no escaping. Names written
+  // together, like `NotoSerif`, are spaced as they're spoken: "Noto Serif".
+  const family = (weight || italic ? match[1] : base)
+    .replace(/_/g, ' ')
+    .replace(/(?<=\p{Ll})(?=\p{Lu})/gu, ' ')
+    .replace(/[^\p{L}\p{N} -]/gu, '')
+    .trim();
+  if (!family) return null;
+  return { family, weight: FONT_WEIGHTS[weight] ?? 400, italic };
+}
+
+/** Replaces the fonts kept from the last folder with the ones in this one. */
+async function readFontsFolder(files) {
+  const folder = files.find((file) => file.webkitRelativePath)?.webkitRelativePath.split('/')[0] || '';
+  const faces = [];
+  const seen = new Set();
+  for (const file of files) {
+    // Only the folder itself, not the folders inside it, as in the app.
+    if (file.webkitRelativePath && file.webkitRelativePath.split('/').length > 2) continue;
+    const face = fontFace(file.name);
+    if (!face) continue;
+    const key = `${face.family}|${face.weight}|${face.italic}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    // Copied, so it stays readable once the chosen files change or go.
+    const blob = new Blob([await file.arrayBuffer()], { type: file.type });
+    faces.push({ name: file.name, ...face, blob });
+  }
+  // Read first: a transaction closes while it waits for anything else.
+  const tx = db.transaction('fonts', 'readwrite');
+  await Promise.all([tx.store.clear(), ...faces.map((face) => tx.store.put(face)), tx.done]);
+  fontsFolder = folder;
+  localStorage.setItem('squidreadFontsFolder', folder);
+  await loadFonts();
+  restyle();
+}
+
+async function loadFonts() {
+  try {
+    fontFaces = await db.getAll('fonts');
+  } catch (error) {
+    log.warn('Could not read the fonts:', error);
+    fontFaces = [];
+  }
+  fontFamilies = [...new Set(fontFaces.map((face) => face.family))].sort((a, b) => a.localeCompare(b));
+  fontFaceCss = null;
+  // Pages already showing keep the old faces until they are styled again, just after.
+  const stale = fontUrls;
+  fontUrls = [];
+  setTimeout(() => stale.forEach((url) => URL.revokeObjectURL(url)), 5000);
+  updateFontPicker();
 }
 
 function switchPanelSection(section) {

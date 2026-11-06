@@ -19,6 +19,7 @@ A native Kotlin app built for e-ink readers: low-power hardware and black-and-wh
 - Links: footnotes open over the page, and Back returns to where a link was followed from. Books can't open other apps or the web on their own: only web and mail links the reader taps open, in another app.
 - Opens EPUB files only, without DRM. Malformed or hostile files are rejected when imported or opened rather than crashing the app.
 - Fonts: the styles menu can replace the book's fonts with any `.ttf`, `.otf`, `.woff` or `.woff2` file from the `fonts` folder at the root of the device's storage. Android asks once for access to that folder. Files named like `Family-Bold.ttf` or `Family Bold Italic.ttf` are grouped into one family.
+- Text layout: the styles menu also sets line spacing, side margins and justification, for every book. Margins apply on top of the book's own styles. Line spacing and justification only apply with the book's styles off, which also evens out the book's font sizes, so the book keeps its styles until either is set; both have a "Book" setting to go back. Justified text is hyphenated where the device's WebView can.
 - Registers for EPUB files, so it appears in "Open with" and the share sheet, and can be set as the default app for EPUB files.
 - No internet permission. The open-source licenses are in `android/app/src/main/assets/licenses.txt`, shown offline from Settings.
 

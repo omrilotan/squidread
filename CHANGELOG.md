@@ -2,6 +2,18 @@
 
 Releases of the Android app. Each entry's notes are what goes into Google Play's "Release notes" (500 characters at most).
 
+## 1.1.0 (versionCode 13)
+
+- Improve "Aa" Menu:
+  - Line spacing, margins and justification, in the Aa menu.
+  - Choose or change the fonts folder from the font picker.
+  - Tap the page preview to go back to the book.
+- Bug fix: removing a font from the fonts folder while reading no longer closes the app.
+
+## 1.0.0 (versionCode 11)
+
+- No changes. Stable release
+
 ## 1.0.0-rc-20261024 (versionCode 10)
 
 - Search the book: find words from Contents, see each match in its sentence, and step between matches on the page.
