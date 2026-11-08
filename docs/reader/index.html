@@ -29,6 +29,22 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <!-- Line icons, drawn in the text colour, so they invert with their buttons. -->
+  <svg class="iconSprite" aria-hidden="true">
+    <symbol id="icon-styles" viewBox="0 0 24 24"><path d="M2 20L8 4l6 16M4.5 14h7M21 16a3 3 0 1 1-6 0a3 3 0 1 1 6 0M21 12.5V20"/></symbol>
+    <symbol id="icon-contents" viewBox="0 0 24 24"><path d="M3 6h2M3 12h2M3 18h2M9 6h12M9 12h12M9 18h12"/></symbol>
+    <symbol id="icon-library" viewBox="0 0 24 24"><path d="M3 4h4v16H3zM9 4h4v16H9zM15 5.5l3.9-1 3.6 14.5-3.9 1z"/></symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24"><path d="M3 7h18M3 17h18"/><path class="filled" d="M10.5 7a2.5 2.5 0 1 1-5 0a2.5 2.5 0 1 1 5 0zM18.5 17a2.5 2.5 0 1 1-5 0a2.5 2.5 0 1 1 5 0z"/></symbol>
+    <symbol id="icon-font-size" viewBox="0 0 24 24"><path d="M2 20l3.5-9 3.5 9M3.4 16.5h4.2M10 20l5.5-16L21 20M12 14.5h7"/></symbol>
+    <symbol id="icon-line-spacing" viewBox="0 0 24 24"><path d="M11 6h10M11 12h10M11 18h10M5 4v16M2.5 6.5L5 4l2.5 2.5M2.5 17.5L5 20l2.5-2.5"/></symbol>
+    <symbol id="icon-margins" viewBox="0 0 28 24"><path d="M2 3v18M26 3v18M6 12h6M9.5 9.5L12 12l-2.5 2.5M22 12h-6M18.5 9.5L16 12l2.5 2.5"/></symbol>
+    <symbol id="icon-font" viewBox="0 0 24 24"><path d="M5 8V5h14v3M12 5v14M9 19h6"/></symbol>
+    <symbol id="icon-align-book" viewBox="0 0 24 24"><path d="M12 7C9.5 5 6 4.5 3 5.5v13c3-1 6.5-.5 9 1.5 2.5-2 6-2.5 9-1.5v-13C18 4.5 14.5 5 12 7zM12 7v13"/></symbol>
+    <symbol id="icon-align-justified" viewBox="0 0 24 24"><path d="M3 5h18M3 10h18M3 15h18M3 20h18"/></symbol>
+    <symbol id="icon-align-hyphenated" viewBox="0 0 24 24"><path d="M3 5h18M3 10h11M18 10h3M3 15h18M3 20h18"/></symbol>
+    <symbol id="icon-align-ragged" viewBox="0 0 24 24"><path d="M3 5h18M3 10h12M3 15h16M3 20h9"/></symbol>
+  </svg>
+
   <!-- Inline progress indicator for reading/downloading/saving -->
   <section id="progress" class="progress" aria-live="polite" aria-atomic="true">
     <div class="bar"><div id="progressFill" class="fill"></div></div>
@@ -97,10 +113,10 @@
       </div>
 
       <nav class="panelNav">
-        <button id="navStyles" class="navBtn active">Aa</button>
-        <button id="navContents" class="navBtn">Contents</button>
-        <button id="navLibrary" class="navBtn">Library</button>
-        <button id="navSettings" class="navBtn">Settings</button>
+        <button id="navStyles" class="navBtn active" title="Reading styles" aria-label="Reading styles"><svg class="icon" aria-hidden="true"><use href="#icon-styles"/></svg></button>
+        <button id="navContents" class="navBtn" title="Contents" aria-label="Contents"><svg class="icon" aria-hidden="true"><use href="#icon-contents"/></svg></button>
+        <button id="navLibrary" class="navBtn" title="Library" aria-label="Library"><svg class="icon" aria-hidden="true"><use href="#icon-library"/></svg></button>
+        <button id="navSettings" class="navBtn" title="Settings" aria-label="Settings"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg></button>
       </nav>
 
       <div class="panelContent">
@@ -134,45 +150,41 @@
           <!-- A framed window onto the page, so changes show as they're made. A tap on it goes back to the book. -->
           <div id="stylesPreview" class="stylesPreview" aria-hidden="true"></div>
           <div class="stylesControls">
-            <!-- Each middle button shows the value; tapping it goes back to the default. -->
+            <!-- Each shows an icon and its value over its buttons; tapping the value goes back to the default. -->
             <div class="steppers">
               <div class="stepper">
-                <h3>Font size</h3>
+                <button id="fontSizeReset" type="button" class="stepperValue" title="Reset font size"><svg class="icon" aria-hidden="true"><use href="#icon-font-size"/></svg><span class="value"></span></button>
                 <div class="segmented">
                   <button id="fontSizeDecrease" type="button" title="Smaller font" aria-label="Smaller font">−</button>
-                  <button id="fontSizeReset" type="button" class="stepperValue" title="Reset font size"></button>
                   <button id="fontSizeIncrease" type="button" title="Larger font" aria-label="Larger font">+</button>
                 </div>
               </div>
               <div class="stepper">
-                <h3>Line spacing</h3>
+                <button id="lineHeightReset" type="button" class="stepperValue" title="Reset line spacing"><svg class="icon" aria-hidden="true"><use href="#icon-line-spacing"/></svg><span class="value"></span></button>
                 <div class="segmented">
                   <button id="lineHeightDecrease" type="button" title="Less line spacing" aria-label="Less line spacing">−</button>
-                  <button id="lineHeightReset" type="button" class="stepperValue" title="Reset line spacing"></button>
                   <button id="lineHeightIncrease" type="button" title="More line spacing" aria-label="More line spacing">+</button>
                 </div>
               </div>
               <div class="stepper">
-                <h3>Margins</h3>
+                <button id="marginsReset" type="button" class="stepperValue" title="Reset margins"><svg class="icon wide" aria-hidden="true"><use href="#icon-margins"/></svg><span class="value"></span></button>
                 <div class="segmented">
                   <button id="marginsDecrease" type="button" title="Narrower margins" aria-label="Narrower margins">−</button>
-                  <button id="marginsReset" type="button" class="stepperValue" title="Reset margins"></button>
                   <button id="marginsIncrease" type="button" title="Wider margins" aria-label="Wider margins">+</button>
                 </div>
               </div>
             </div>
-            <h3>Font</h3>
-            <!-- The middle button names the font, or, without fonts, asks for the folder. -->
+            <!-- The middle button names the font, or, without fonts, asks for the folder and fills the row. -->
             <div class="segmented fontPicker">
               <button id="fontPrevious" type="button" title="Previous font" aria-label="Previous font">‹</button>
-              <button id="fontName" type="button" class="fontName"></button>
+              <button id="fontName" type="button" class="fontName"><svg class="icon" aria-hidden="true"><use href="#icon-font"/></svg><span class="value"></span></button>
               <button id="fontNext" type="button" title="Next font" aria-label="Next font">›</button>
             </div>
-            <h3>Justify</h3>
-            <div class="segmented" role="radiogroup" aria-label="Justify">
-              <button type="button" data-justify="book" aria-pressed="false">Book</button>
-              <button type="button" data-justify="on" aria-pressed="false">On</button>
-              <button type="button" data-justify="off" aria-pressed="false">Off</button>
+            <div class="segmented justify" role="radiogroup" aria-label="Text alignment">
+              <button type="button" data-justify="book" aria-pressed="false" title="Book’s text alignment"><svg class="icon" aria-hidden="true"><use href="#icon-align-book"/></svg>Book’s</button>
+              <button type="button" data-justify="off" aria-pressed="false" title="Ragged edge, aligned to the start"><svg class="icon" aria-hidden="true"><use href="#icon-align-ragged"/></svg>Ragged</button>
+              <button type="button" data-justify="on" aria-pressed="false" title="Justified, without hyphens"><svg class="icon" aria-hidden="true"><use href="#icon-align-justified"/></svg>Justified</button>
+              <button type="button" data-justify="hyphenated" aria-pressed="false" title="Justified, with words hyphenated"><svg class="icon" aria-hidden="true"><use href="#icon-align-hyphenated"/></svg>Hyphenated</button>
             </div>
           </div>
         </section>

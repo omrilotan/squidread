@@ -37,6 +37,13 @@ Requires JDK 17+ and the Android SDK (set `sdk.dir` in `android/local.properties
 
 Bump `versionCode` and `versionName` in `android/app/build.gradle.kts` for every release, and add its notes to [CHANGELOG.md](CHANGELOG.md). Each entry's notes are what goes into Google Play's release notes, 500 characters at most.
 
+Tag the commit each release is built from, so fixes can be backported to it later:
+
+```sh
+git tag -a android-v1.1.0 -m "Android 1.1.0 (versionCode 13)"
+git push origin android-v1.1.0
+```
+
 ## Website and web reader
 
 `make site` serves both at http://localhost:5050, with the reader under `/reader/`.

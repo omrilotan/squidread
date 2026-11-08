@@ -2,6 +2,12 @@
 
 Releases of the Android app. Each entry's notes are what goes into Google Play's "Release notes" (500 characters at most).
 
+## 1.2.0 (versionCode 14)
+
+- Icons for the menu tabs and the Aa settings, so values no longer get cut off on narrow screens or with large text.
+- Text alignment: Book’s, Ragged, Justified or Hyphenated.
+- Bug fix: justified text no longer breaks words with hyphens.
+
 ## 1.1.0 (versionCode 13)
 
 - Improve "Aa" Menu:

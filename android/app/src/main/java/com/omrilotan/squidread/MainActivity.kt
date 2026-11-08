@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.Configuration
+import android.graphics.Paint
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -134,7 +135,7 @@ class MainActivity : AppCompatActivity() {
 	private lateinit var fontSizeValue: TextView
 	private lateinit var lineHeightValue: TextView
 	private lateinit var pageMarginsValue: TextView
-	private lateinit var justifyButtons: Map<Boolean?, TextView>
+	private lateinit var alignmentButtons: Map<Alignment?, TextView>
 	private lateinit var fontName: TextView
 	private lateinit var fontPrevious: View
 	private lateinit var fontNext: View
@@ -552,12 +553,16 @@ class MainActivity : AppCompatActivity() {
 		fontSizeValue = findViewById(R.id.font_reset)
 		lineHeightValue = findViewById(R.id.line_height_reset)
 		pageMarginsValue = findViewById(R.id.margins_reset)
-		justifyButtons = mapOf(
-			null to findViewById(R.id.justify_book),
-			true to findViewById(R.id.justify_on),
-			false to findViewById(R.id.justify_off),
+		alignmentButtons = mapOf(
+			null to findViewById(R.id.align_book),
+			Alignment.RAGGED to findViewById(R.id.align_ragged),
+			Alignment.JUSTIFIED to findViewById(R.id.align_justified),
+			Alignment.HYPHENATED to findViewById(R.id.align_hyphenated),
 		)
+		// The values are underlined: tapping one resets it.
+		listOf(fontSizeValue, lineHeightValue, pageMarginsValue).forEach { it.paintFlags = it.paintFlags or Paint.UNDERLINE_TEXT_FLAG }
 		fontName = findViewById(R.id.font_name)
+		fontName.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> centerFontIcon() }
 		fontPrevious = findViewById(R.id.font_previous)
 		fontNext = findViewById(R.id.font_next)
 		tocList = findViewById(R.id.toc_list)
@@ -603,7 +608,7 @@ class MainActivity : AppCompatActivity() {
 		findViewById<View>(R.id.margins_decrease).setOnClickListener { changePageMargins(-ReaderPreferences.PAGE_MARGINS_STEP) }
 		findViewById<View>(R.id.margins_increase).setOnClickListener { changePageMargins(ReaderPreferences.PAGE_MARGINS_STEP) }
 		pageMarginsValue.setOnClickListener { setPageMargins(1.0) }
-		justifyButtons.forEach { (value, view) -> view.setOnClickListener { setJustify(value) } }
+		alignmentButtons.forEach { (value, view) -> view.setOnClickListener { setAlignment(value) } }
 		fontPrevious.setOnClickListener { cycleFont(-1) }
 		fontNext.setOnClickListener { cycleFont(1) }
 		// Without fonts, the middle button asks for the folder, also to replace an empty one.
@@ -1244,10 +1249,12 @@ class MainActivity : AppCompatActivity() {
 		theme = if (isNight) Theme.DARK else Theme.LIGHT,
 		lineHeight = prefs.lineHeight,
 		pageMargins = prefs.pageMargins,
-		textAlign = prefs.justify?.let { if (it) TextAlign.JUSTIFY else TextAlign.START },
+		textAlign = prefs.alignment?.let { if (it == Alignment.RAGGED) TextAlign.START else TextAlign.JUSTIFY },
+		// Readium hyphenates justified text by default; words stay whole unless hyphenation is chosen.
+		hyphens = prefs.alignment?.let { it == Alignment.HYPHENATED },
 		// Readium applies line spacing and alignment only over the book's own styles, and then also
 		// evens out the book's font sizes; so the book keeps its styles until either is chosen.
-		publisherStyles = if (prefs.lineHeight == null && prefs.justify == null) null else false,
+		publisherStyles = if (prefs.lineHeight == null && prefs.alignment == null) null else false,
 		// Maximum contrast for e-ink, whatever greys the book asks for.
 		textColor = Color(ContextCompat.getColor(this, R.color.ink)),
 		backgroundColor = Color(ContextCompat.getColor(this, R.color.paper)),
@@ -1769,7 +1776,7 @@ class MainActivity : AppCompatActivity() {
 		}
 	}
 
-	/** The reset button shows the size, like the line spacing and margin buttons. */
+	/** The size shows by the font size icon, like the line spacing and margins by theirs. */
 	private fun updateFontSizeLabel() {
 		val size = "${(prefs.fontSize * 100).roundToInt()}%"
 		fontSizeValue.setTextIfChanged(size)
@@ -1802,15 +1809,15 @@ class MainActivity : AppCompatActivity() {
 		updateLayoutControls()
 	}
 
-	/** Justifies the text (true), aligns it to the start (false), or leaves it to the book (null). */
-	private fun setJustify(value: Boolean?) {
-		if (value == prefs.justify) return
-		prefs.justify = value
+	/** Sets the text alignment, or null to leave it to the book. */
+	private fun setAlignment(value: Alignment?) {
+		if (value == prefs.alignment) return
+		prefs.alignment = value
 		restyle()
 		updateLayoutControls()
 	}
 
-	/** The line spacing and margin buttons show their values; tapping one goes back to the default. */
+	/** The line spacing and margins show their values; tapping one goes back to the default. */
 	private fun updateLayoutControls() {
 		val lineHeight = prefs.lineHeight?.toString() ?: getString(R.string.style_book)
 		lineHeightValue.setTextIfChanged(lineHeight)
@@ -1818,7 +1825,7 @@ class MainActivity : AppCompatActivity() {
 		val margins = "${(prefs.pageMargins * 100).roundToInt()}%"
 		pageMarginsValue.setTextIfChanged(margins)
 		ViewCompat.setStateDescription(pageMarginsValue, margins)
-		justifyButtons.forEach { (value, view) -> view.isSelected = value == prefs.justify }
+		alignmentButtons.forEach { (value, view) -> view.isSelected = value == prefs.alignment }
 	}
 
 	/** Shows the fonts known so far right away, then again if listing the folder finds changes. */
@@ -1844,13 +1851,26 @@ class MainActivity : AppCompatActivity() {
 		fontName.setTextIfChanged(
 			when {
 				families.isNotEmpty() -> currentFontFamily() ?: getString(R.string.book_font)
-				access -> getString(R.string.fonts_empty, fonts.folderName)
+				access -> getString(R.string.fonts_empty)
 				else -> getString(R.string.fonts_allow)
 			},
 		)
-		// Nothing to step through without fonts.
-		fontPrevious.isEnabled = families.isNotEmpty()
-		fontNext.isEnabled = families.isNotEmpty()
+		centerFontIcon()
+		// Nothing to step through without fonts: the middle button takes the whole row.
+		val arrows = if (families.isNotEmpty()) View.VISIBLE else View.GONE
+		if (fontPrevious.visibility != arrows) fontPrevious.visibility = arrows
+		if (fontNext.visibility != arrows) fontNext.visibility = arrows
+	}
+
+	/** Keeps the font icon beside the name, centred together, rather than at the button's edge. */
+	private fun centerFontIcon() {
+		val icon = fontName.compoundDrawablesRelative[0] ?: return
+		val content = icon.intrinsicWidth + fontName.compoundDrawablePadding +
+			fontName.paint.measureText(fontName.text.toString()).roundToInt()
+		val side = ((fontName.width - content) / 2).coerceAtLeast((12 * resources.displayMetrics.density).roundToInt())
+		if (fontName.paddingStart != side || fontName.paddingEnd != side) {
+			fontName.setPaddingRelative(side, fontName.paddingTop, side, fontName.paddingBottom)
+		}
 	}
 
 	private fun cycleFont(step: Int) {

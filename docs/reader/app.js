@@ -2138,7 +2138,7 @@ function restorePlace(tries) {
 }
 
 function applyFontSize() {
-  const fontSizeValueEl = document.getElementById('fontSizeReset');
+  const fontSizeValueEl = document.querySelector('#fontSizeReset .value');
   if (fontSizeValueEl) fontSizeValueEl.textContent = `${Math.round(currentFontSize * 100)}%`;
   if (!rendition) return;
   
@@ -2157,7 +2157,8 @@ const BOOK_LINE_HEIGHT = 1.5;
 const MIN_PAGE_MARGINS = 0;
 const MAX_PAGE_MARGINS = 3;
 const PAGE_MARGINS_STEP = 0.5;
-const JUSTIFY_MODES = ['book', 'on', 'off'];
+// The book's own alignment, ragged ('off'), justified ('on'), or justified and hyphenated.
+const JUSTIFY_MODES = ['book', 'off', 'on', 'hyphenated'];
 const FONT_EXTENSIONS = new Set(['ttf', 'otf', 'woff', 'woff2']);
 const FONT_WEIGHTS = {
   thin: 100, hairline: 100, extralight: 200, ultralight: 200, light: 300, regular: 400, normal: 400, book: 400,
@@ -2291,10 +2292,10 @@ function restyle() {
   restorePlace(KEEP_PLACE_TRIES);
 }
 
-/** The middle buttons show their values; tapping one goes back to the default. */
+/** The line spacing and margins show their values; tapping one goes back to the default. */
 function updateLayoutControls() {
-  document.getElementById('lineHeightReset').textContent = lineHeight === null ? 'Book' : lineHeight.toFixed(1);
-  document.getElementById('marginsReset').textContent = `${Math.round(pageMargins * 100)}%`;
+  document.querySelector('#lineHeightReset .value').textContent = lineHeight === null ? 'Book’s' : lineHeight.toFixed(1);
+  document.querySelector('#marginsReset .value').textContent = `${Math.round(pageMargins * 100)}%`;
   document.querySelectorAll('[data-justify]').forEach((button) => {
     button.setAttribute('aria-pressed', button.dataset.justify === justify ? 'true' : 'false');
   });
@@ -2321,8 +2322,10 @@ function readingCss() {
     rules.push(`html body, html body * { line-height: ${lineHeight} !important; }`);
   }
   if (justify !== 'book') {
-    const align = justify === 'on' ? 'justify' : 'start';
-    rules.push(`html body, html body p, html body li, html body dd, html body blockquote { text-align: ${align} !important; }`);
+    const align = justify === 'off' ? 'start' : 'justify';
+    // Words stay whole unless hyphenation is chosen.
+    const hyphens = justify === 'hyphenated' ? 'auto' : 'manual';
+    rules.push(`html body, html body p, html body li, html body dd, html body blockquote { text-align: ${align} !important; -webkit-hyphens: ${hyphens} !important; hyphens: ${hyphens} !important; }`);
   }
   const family = currentFontFamily();
   if (family) {
@@ -2360,13 +2363,13 @@ function updateFontPicker() {
   if (!name) return;
   let label;
   if (fontFamilies.length) label = currentFontFamily() ?? 'Book font';
-  else if (fontsFolder !== null) label = fontsFolder ? `No fonts in ${fontsFolder}` : 'No fonts in that folder';
+  else if (fontsFolder !== null) label = 'Fonts folder is empty';
   else label = 'Choose fonts folder';
-  name.textContent = label;
+  name.querySelector('.value').textContent = label;
   name.title = label;
-  // Nothing to step through without fonts.
-  document.getElementById('fontPrevious').disabled = !fontFamilies.length;
-  document.getElementById('fontNext').disabled = !fontFamilies.length;
+  // Nothing to step through without fonts: the middle button takes the whole row.
+  document.getElementById('fontPrevious').classList.toggle('hidden', !fontFamilies.length);
+  document.getElementById('fontNext').classList.toggle('hidden', !fontFamilies.length);
 }
 
 function cycleFont(step) {

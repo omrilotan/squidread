@@ -2,7 +2,7 @@
 <resources>
   <string name="app_name">Squidread</string>
   <string name="close_menu">Close menu</string>
-  <string name="tab_styles">Aa</string>
+  <string name="tab_styles">Reading styles</string>
   <string name="tab_contents">Contents</string>
   <string name="tab_library">Library</string>
   <string name="tab_settings">Settings</string>
@@ -20,7 +20,6 @@
   <string name="reader_intro_free">Or find a free one. Project Gutenberg has thousands of classics, like Dracula:</string>
   <string name="opening">Opening…</string>
   <string name="add_epub">+ Add EPUB</string>
-  <string name="font_size">Font size</string>
   <string name="font_size_reset">Reset font size</string>
   <string name="font_size_smaller">Smaller font</string>
   <string name="font_size_larger">Larger font</string>
@@ -28,19 +27,22 @@
   <string name="book_font">Book font</string>
   <string name="font_previous">Previous font</string>
   <string name="font_next">Next font</string>
-  <string name="style_book">Book</string>
-  <string name="line_spacing">Line spacing</string>
+  <string name="style_book">Book’s</string>
   <string name="line_spacing_less">Less line spacing</string>
   <string name="line_spacing_more">More line spacing</string>
   <string name="line_spacing_reset">Reset line spacing</string>
-  <string name="margins">Margins</string>
   <string name="margins_narrower">Narrower margins</string>
   <string name="margins_wider">Wider margins</string>
   <string name="margins_reset">Reset margins</string>
-  <string name="justify">Justify</string>
-  <string name="justify_on">On</string>
-  <string name="justify_off">Off</string>
-  <string name="fonts_empty">No fonts in %1$s</string>
+  <string name="align_book">Book’s</string>
+  <string name="align_ragged">Ragged</string>
+  <string name="align_justified">Justified</string>
+  <string name="align_hyphenated">Hyphenated</string>
+  <string name="align_book_description">Book’s text alignment</string>
+  <string name="align_ragged_description">Ragged edge, aligned to the start</string>
+  <string name="align_justified_description">Justified, without hyphens</string>
+  <string name="align_hyphenated_description">Justified, with words hyphenated</string>
+  <string name="fonts_empty">Fonts folder is empty</string>
   <string name="fonts_allow">Choose fonts folder</string>
   <string name="fonts_change">Change folder</string>
   <string name="no_contents">Open a book to see its table of contents.</string>

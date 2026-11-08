@@ -9,6 +9,9 @@ enum class ZoneAction { PREV, MENU, NEXT }
 /** Light is black on white, dark is white on black; system follows the device's dark theme. */
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+/** Text alignment over the book's own: a ragged edge, justified, or justified with hyphenation. */
+enum class Alignment { RAGGED, JUSTIFIED, HYPHENATED }
+
 class ReaderPreferences(context: Context) {
 	private val prefs = context.getSharedPreferences("squidread", Context.MODE_PRIVATE)
 
@@ -41,10 +44,16 @@ class ReaderPreferences(context: Context) {
 		get() = tenths(prefs.getFloat(PAGE_MARGINS, 1f))
 		set(value) = prefs.edit { putFloat(PAGE_MARGINS, value.toFloat()) }
 
-	/** Whether to justify the text (true) or align it to the start (false); null for the book's own. */
-	var justify: Boolean?
-		get() = if (prefs.contains(JUSTIFY)) prefs.getBoolean(JUSTIFY, false) else null
-		set(value) = prefs.edit { if (value == null) remove(JUSTIFY) else putBoolean(JUSTIFY, value) }
+	/** The text alignment; null for the book's own. Reads 1.1.0's justify setting until one is chosen. */
+	var alignment: Alignment?
+		get() = prefs.getString(ALIGNMENT, null)?.let { name -> Alignment.entries.firstOrNull { it.name == name } }
+			?: if (prefs.contains(JUSTIFY)) {
+				if (prefs.getBoolean(JUSTIFY, false)) Alignment.JUSTIFIED else Alignment.RAGGED
+			} else null
+		set(value) = prefs.edit {
+			remove(JUSTIFY)
+			if (value == null) remove(ALIGNMENT) else putString(ALIGNMENT, value.name)
+		}
 
 	/** Row-major 3×3 grid of tap zone actions, configured for left-to-right books. */
 	var zones: List<ZoneAction>
@@ -99,6 +108,7 @@ class ReaderPreferences(context: Context) {
 		private const val FONT_FAMILY = "fontFamily"
 		private const val LINE_HEIGHT = "lineHeight"
 		private const val PAGE_MARGINS = "pageMargins"
+		private const val ALIGNMENT = "alignment"
 		private const val JUSTIFY = "justify"
 		private const val FONTS_FOLDER = "fontsFolder"
 		private const val FONTS_CACHE = "fontsCache"

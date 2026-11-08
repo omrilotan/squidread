@@ -109,6 +109,32 @@ button:disabled:active {
   display: flex;
 }
 
+/* Line icons: strokes in the text colour, so they invert with their buttons. */
+.iconSprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.icon {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: square;
+}
+
+.icon.wide {
+  width: 28px;
+}
+
+.icon .filled {
+  fill: currentColor;
+  stroke: none;
+}
+
 .segmented > button {
   flex: 1 1 0;
   min-width: 0;
@@ -197,9 +223,11 @@ button:disabled:active {
   flex: 1 1 0;
   min-width: 0;
   padding: 0 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.navBtn .icon {
+  width: 28px;
+  height: 28px;
 }
 
 .navBtn + .navBtn {
@@ -263,7 +291,7 @@ button:disabled:active {
   text-align: center;
 }
 
-/* Font size, line spacing and margins side by side, each − value +. */
+/* Font size, line spacing and margins side by side: an icon and the value over − and +. */
 .steppers {
   display: flex;
   gap: 8px;
@@ -274,31 +302,35 @@ button:disabled:active {
   min-width: 0;
 }
 
-.stylesControls h3 {
-  margin: 8px 0 4px;
-  overflow: hidden;
-  font-size: 16px;
+/* The value is underlined, as tapping it resets. */
+.stepperValue,
+.stepperValue:active {
+  gap: 6px;
+  width: 100%;
+  min-height: 40px;
+  margin-top: 4px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
-/* The side buttons give way on a phone, so the value between them still fits. */
+.stepperValue .value {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .stepper > .segmented > button {
-  flex: 0 0 clamp(32px, 9vw, 44px);
   padding: 0;
   font-size: 22px;
 }
 
-.stepper > .segmented > .stepperValue {
-  flex: 1 1 0;
-  font-size: inherit;
-  font-variant-numeric: tabular-nums;
-}
-
-@media (max-width: 380px) {
-  .stepper > .segmented > .stepperValue {
-    font-size: 14px;
-  }
+.fontPicker,
+.stylesControls > .justify {
+  margin-top: 12px;
 }
 
 .fontPicker > button {
@@ -308,10 +340,22 @@ button:disabled:active {
 
 .fontPicker > .fontName {
   flex: 1 1 0;
-  overflow: hidden;
+  gap: 8px;
   font-size: inherit;
+}
+
+.fontName .value {
+  overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* Justify: an icon over a small label. */
+.justify > button {
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 4px 4px;
+  font-size: 12px;
 }
 
 .fontList {

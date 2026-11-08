@@ -50,6 +50,12 @@
     <item name="autoSizeMinTextSize">10sp</item>
     <item name="autoSizeMaxTextSize">16sp</item>
   </style>
+  <style name="Squidread.Tab.Icon">
+    <item name="android:tint">@color/button_text</item>
+    <item name="android:scaleType">center</item>
+    <item name="android:paddingTop">8dp</item>
+    <item name="android:paddingBottom">8dp</item>
+  </style>
 
   <style name="Squidread.Heading" parent="">
     <item name="android:textSize">18sp</item>
@@ -60,9 +66,34 @@
   </style>
 
   <!-- For the reading settings below the preview, which should leave the book as much room as they can. -->
-  <style name="Squidread.Heading.Compact">
-    <item name="android:textSize">16sp</item>
-    <item name="android:paddingTop">8dp</item>
+  <!-- An icon and its value over a stepper's buttons; the value is underlined, as tapping it resets. -->
+  <style name="Squidread.StepperValue" parent="">
+    <item name="android:textSize">15sp</item>
+    <item name="android:textColor">@color/ink</item>
+    <item name="android:drawableTint">@color/ink</item>
+    <item name="android:drawablePadding">6dp</item>
+    <item name="android:gravity">center</item>
+    <item name="android:maxLines">1</item>
+    <item name="android:minHeight">40dp</item>
+    <item name="android:paddingTop">4dp</item>
+    <item name="android:paddingStart">4dp</item>
+    <item name="android:paddingEnd">4dp</item>
+    <item name="android:clickable">true</item>
+    <item name="android:focusable">true</item>
+  </style>
+  <!-- An icon over a small label, as in the Justify buttons. -->
+  <style name="Squidread.Button.IconLabel">
+    <item name="android:drawableTint">@color/button_text</item>
+    <item name="android:drawablePadding">2dp</item>
+    <item name="android:textSize">12sp</item>
+    <!-- One line; a long label shrinks to fit with large system text. -->
+    <item name="android:maxLines">1</item>
+    <item name="autoSizeTextType">uniform</item>
+    <item name="autoSizeMinTextSize">9sp</item>
+    <item name="autoSizeMaxTextSize">12sp</item>
+    <item name="android:paddingTop">6dp</item>
     <item name="android:paddingBottom">4dp</item>
+    <item name="android:paddingStart">4dp</item>
+    <item name="android:paddingEnd">4dp</item>
   </style>
 </resources>
