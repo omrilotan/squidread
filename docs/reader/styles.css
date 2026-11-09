@@ -1,6 +1,6 @@
 /*
  * Same look as the Android app: two colours only (ink and paper, swapped in the dark theme),
- * 2px square borders, selected and pressed controls inverted, no shadows, no animations.
+ * 1px square borders, selected and pressed controls inverted, no shadows, no animations.
  * Meant to read well on e-ink, where greys smear and every transition is a slow refresh.
  */
 
@@ -11,7 +11,7 @@
 :root {
   --ink: #000;
   --paper: #fff;
-  --line: 2px;
+  --line: 1px;
   --gap: 16px;
   --footer-height: 40px;
   --viewport-height: 100vh;
@@ -122,7 +122,7 @@ button:disabled:active {
   height: 24px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: 1;
   stroke-linecap: square;
 }
 
