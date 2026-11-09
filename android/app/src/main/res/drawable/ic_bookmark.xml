@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Line icon, tinted by its view: a ribbon marking a page. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="28dp" android:height="28dp" android:viewportWidth="24" android:viewportHeight="24">
+  <path android:strokeColor="#000000" android:strokeWidth="1" android:strokeLineCap="square" android:strokeLineJoin="miter" android:pathData="M6,3h12v18l-6,-5l-6,5z" />
+</vector>

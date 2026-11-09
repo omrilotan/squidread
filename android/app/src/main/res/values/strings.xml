@@ -46,6 +46,10 @@
   <string name="fonts_allow">Choose fonts folder</string>
   <string name="fonts_change">Change folder</string>
   <string name="no_contents">Open a book to see its table of contents.</string>
+  <string name="bookmarks">Bookmarks</string>
+  <string name="bookmark_add">Bookmark this page</string>
+  <string name="bookmark_remove">Remove bookmark</string>
+  <string name="bookmark_no_text">A page without text</string>
   <string name="no_toc">This book has no table of contents.</string>
   <string name="toc_sections">This book has no table of contents. Its sections, in order:</string>
   <string name="toc_section">Section %1$d</string>
@@ -67,7 +71,7 @@
     <item quantity="other">The first %1$d results</item>
   </plurals>
   <string name="zones_heading">Tap zone actions</string>
-  <string name="zones_hint">Tap a zone to cycle its action. For right-to-left books, the grid is mirrored.</string>
+  <string name="zones_hint">Tap to change. Mirrored for right-to-left books.</string>
   <string name="zone_prev">‹ Prev</string>
   <string name="zone_next">Next ›</string>
   <string name="zone_menu">Menu</string>

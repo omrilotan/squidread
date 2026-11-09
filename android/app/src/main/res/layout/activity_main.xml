@@ -192,7 +192,7 @@
         android:background="@drawable/frame_thick"
         android:layoutDirection="ltr"
         android:orientation="horizontal"
-        android:padding="2dp"
+        android:padding="1dp"
         android:visibility="gone">
 
         <TextView
@@ -481,6 +481,21 @@
         android:textSize="20sp"
         android:textStyle="bold" />
 
+      <!-- Inverted while the page showing has a bookmark; hidden without a book in pages. -->
+      <ImageView
+        android:id="@+id/bookmark_toggle"
+        style="@style/Squidread.Button"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginEnd="8dp"
+        android:contentDescription="@string/bookmark_add"
+        android:paddingStart="0dp"
+        android:paddingEnd="0dp"
+        android:scaleType="center"
+        android:src="@drawable/ic_bookmark"
+        android:tint="@color/button_text"
+        android:visibility="gone" />
+
       <TextView
         android:id="@+id/close_menu"
         style="@style/Squidread.Button"
@@ -507,7 +522,7 @@
         style="@style/Squidread.Tab.Icon"
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_marginStart="-2dp"
+        android:layout_marginStart="-1dp"
         android:layout_marginEnd="-1dp"
         android:layout_weight="1"
         android:contentDescription="@string/tab_styles"
@@ -523,6 +538,19 @@
         android:layout_weight="1"
         android:contentDescription="@string/tab_contents"
         android:src="@drawable/ic_tab_contents" />
+
+      <!-- Only for a book with bookmarks. -->
+      <ImageView
+        android:id="@+id/tab_bookmarks"
+        style="@style/Squidread.Tab.Icon"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="-1dp"
+        android:layout_marginEnd="-1dp"
+        android:layout_weight="1"
+        android:contentDescription="@string/bookmarks"
+        android:src="@drawable/ic_bookmark"
+        android:visibility="gone" />
 
       <ImageView
         android:id="@+id/tab_library"
@@ -541,7 +569,7 @@
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_marginStart="-1dp"
-        android:layout_marginEnd="-2dp"
+        android:layout_marginEnd="-1dp"
         android:layout_weight="1"
         android:contentDescription="@string/tab_settings"
         android:src="@drawable/ic_tab_settings" />
@@ -620,7 +648,7 @@
                     style="@style/Squidread.Button"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="-2dp"
+                    android:layout_marginEnd="-1dp"
                     android:layout_weight="1"
                     android:contentDescription="@string/font_size_smaller"
                     android:paddingStart="0dp"
@@ -669,7 +697,7 @@
                     style="@style/Squidread.Button"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="-2dp"
+                    android:layout_marginEnd="-1dp"
                     android:layout_weight="1"
                     android:contentDescription="@string/line_spacing_less"
                     android:paddingStart="0dp"
@@ -718,7 +746,7 @@
                     style="@style/Squidread.Button"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="-2dp"
+                    android:layout_marginEnd="-1dp"
                     android:layout_weight="1"
                     android:contentDescription="@string/margins_narrower"
                     android:paddingStart="0dp"
@@ -758,7 +786,7 @@
                 style="@style/Squidread.Button"
                 android:layout_width="64dp"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="-2dp"
+                android:layout_marginEnd="-1dp"
                 android:contentDescription="@string/font_previous"
                 android:text="@string/previous_symbol"
                 android:textSize="22sp" />
@@ -779,7 +807,7 @@
                 style="@style/Squidread.Button"
                 android:layout_width="64dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="-2dp"
+                android:layout_marginStart="-1dp"
                 android:contentDescription="@string/font_next"
                 android:text="@string/next_symbol"
                 android:textSize="22sp" />
@@ -810,7 +838,7 @@
                 style="@style/Squidread.Button.IconLabel"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="-2dp"
+                android:layout_marginStart="-1dp"
                 android:layout_weight="1"
                 android:contentDescription="@string/align_ragged_description"
                 android:drawableTop="@drawable/ic_align_ragged"
@@ -821,7 +849,7 @@
                 style="@style/Squidread.Button.IconLabel"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="-2dp"
+                android:layout_marginStart="-1dp"
                 android:layout_weight="1"
                 android:contentDescription="@string/align_justified_description"
                 android:drawableTop="@drawable/ic_align_justified"
@@ -832,7 +860,7 @@
                 style="@style/Squidread.Button.IconLabel"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="-2dp"
+                android:layout_marginStart="-1dp"
                 android:layout_weight="1"
                 android:contentDescription="@string/align_hyphenated_description"
                 android:drawableTop="@drawable/ic_align_hyphenated"
@@ -862,7 +890,7 @@
           android:layout_marginBottom="8dp"
           android:background="@drawable/frame_thick"
           android:orientation="horizontal"
-          android:padding="2dp">
+          android:padding="1dp">
 
           <EditText
             android:id="@+id/search_field"
@@ -941,6 +969,15 @@
           android:scrollbars="none" />
       </LinearLayout>
 
+      <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/bookmark_list"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/paper"
+        android:overScrollMode="never"
+        android:scrollbars="none"
+        android:visibility="gone" />
+
       <!-- With books in the library, a field above them narrows the list by title or author. -->
       <LinearLayout
         android:id="@+id/section_library"
@@ -959,7 +996,7 @@
           android:layout_marginEnd="16dp"
           android:background="@drawable/frame_thick"
           android:orientation="horizontal"
-          android:padding="2dp">
+          android:padding="1dp">
 
           <EditText
             android:id="@+id/library_search_field"

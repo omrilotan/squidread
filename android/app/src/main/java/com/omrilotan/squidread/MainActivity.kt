@@ -97,6 +97,7 @@ import org.readium.r2.shared.publication.services.search.search
 import org.readium.r2.shared.util.AbsoluteUrl
 import org.readium.r2.shared.util.use
 import java.util.Date
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** A book opened in the background, with its contents list built there too. */
@@ -105,7 +106,7 @@ private class OpenedBook(val publication: Publication, val toc: List<TocEntry>, 
 
 @OptIn(ExperimentalReadiumApi::class)
 class MainActivity : AppCompatActivity() {
-	private enum class Section { STYLES, CONTENTS, LIBRARY, SETTINGS }
+	private enum class Section { STYLES, CONTENTS, BOOKMARKS, LIBRARY, SETTINGS }
 
 	private val app get() = application as SquidreadApplication
 	private val prefs get() = app.prefs
@@ -132,6 +133,7 @@ class MainActivity : AppCompatActivity() {
 	private lateinit var systemBars: WindowInsetsControllerCompat
 	private lateinit var barScrims: List<View>
 	private lateinit var menuTitle: TextView
+	private lateinit var bookmarkToggle: ImageView
 	private lateinit var fontSizeValue: TextView
 	private lateinit var lineHeightValue: TextView
 	private lateinit var pageMarginsValue: TextView
@@ -141,6 +143,7 @@ class MainActivity : AppCompatActivity() {
 	private lateinit var fontNext: View
 	private lateinit var tocList: RecyclerView
 	private lateinit var tocEmpty: TextView
+	private lateinit var bookmarkList: RecyclerView
 	private lateinit var searchRow: View
 	private lateinit var searchField: EditText
 	private lateinit var searchClear: View
@@ -164,6 +167,7 @@ class MainActivity : AppCompatActivity() {
 
 	private val tocAdapter = TocAdapter { entry -> navigateTo(entry) }
 	private val searchAdapter = SearchAdapter { index -> showResult(index) }
+	private val bookmarkAdapter = BookmarkAdapter(onSelect = { index -> goToBookmark(index) }, onRemove = { index -> removeBookmark(index) })
 	private lateinit var libraryAdapter: LibraryAdapter
 
 	private var book: Book? = null
@@ -199,6 +203,13 @@ class MainActivity : AppCompatActivity() {
 	private var pendingJump: Job? = null
 	private var sectionTitlesJob: Job? = null
 	private var showsSections = false
+
+	/** The open book's bookmarks, in reading order. */
+	private var bookmarks: List<Locator> = emptyList()
+
+	/** The bookmark on the page showing, by its place in [bookmarks]; -1 for none. */
+	private var pageBookmark = -1
+	private var pageBookmarkJob: Job? = null
 
 	/** The words searched for, while their results replace the contents list; see [search]. */
 	private var searchQuery: String? = null
@@ -550,6 +561,7 @@ class MainActivity : AppCompatActivity() {
 		progressView = findViewById(R.id.progress)
 		menu = findViewById(R.id.menu)
 		menuTitle = findViewById(R.id.menu_title)
+		bookmarkToggle = findViewById(R.id.bookmark_toggle)
 		fontSizeValue = findViewById(R.id.font_reset)
 		lineHeightValue = findViewById(R.id.line_height_reset)
 		pageMarginsValue = findViewById(R.id.margins_reset)
@@ -567,6 +579,7 @@ class MainActivity : AppCompatActivity() {
 		fontNext = findViewById(R.id.font_next)
 		tocList = findViewById(R.id.toc_list)
 		tocEmpty = findViewById(R.id.toc_empty)
+		bookmarkList = findViewById(R.id.bookmark_list)
 		searchRow = findViewById(R.id.search_row)
 		searchField = findViewById(R.id.search_field)
 		searchClear = findViewById(R.id.search_clear)
@@ -583,12 +596,14 @@ class MainActivity : AppCompatActivity() {
 		sectionViews = mapOf(
 			Section.STYLES to findViewById(R.id.section_styles),
 			Section.CONTENTS to findViewById(R.id.section_contents),
+			Section.BOOKMARKS to findViewById(R.id.bookmark_list),
 			Section.LIBRARY to findViewById(R.id.section_library),
 			Section.SETTINGS to findViewById(R.id.section_settings),
 		)
 		tabViews = mapOf(
 			Section.STYLES to findViewById(R.id.tab_styles),
 			Section.CONTENTS to findViewById(R.id.tab_contents),
+			Section.BOOKMARKS to findViewById(R.id.tab_bookmarks),
 			Section.LIBRARY to findViewById(R.id.tab_library),
 			Section.SETTINGS to findViewById(R.id.tab_settings),
 		)
@@ -596,6 +611,7 @@ class MainActivity : AppCompatActivity() {
 
 	private fun setUpMenu() {
 		findViewById<View>(R.id.close_menu).setOnClickListener { closeMenu() }
+		bookmarkToggle.setOnClickListener { toggleBookmark() }
 		chapterInfoView.setOnClickListener { if (navigator != null) openMenu(Section.CONTENTS) }
 		tabViews.forEach { (tab, view) -> view.setOnClickListener { showSection(tab) } }
 
@@ -621,6 +637,10 @@ class MainActivity : AppCompatActivity() {
 		tocList.layoutManager = LinearLayoutManager(this)
 		tocList.itemAnimator = null
 		tocList.adapter = tocAdapter
+
+		bookmarkList.layoutManager = LinearLayoutManager(this)
+		bookmarkList.itemAnimator = null
+		bookmarkList.adapter = bookmarkAdapter
 
 		searchList.layoutManager = LinearLayoutManager(this)
 		searchList.itemAnimator = null
@@ -991,6 +1011,8 @@ class MainActivity : AppCompatActivity() {
 		publication = opened.publication
 		menuTitle.text = selected.title
 		tocAdapter.submit(opened.toc)
+		bookmarks = selected.bookmarks.mapNotNull { json -> runCatching { Locator.fromJSON(JSONObject(json)) }.getOrNull() }
+		updateBookmarksTab()
 		showsSections = opened.sections
 		if (opened.sections) findSectionTitles(opened)
 
@@ -1059,6 +1081,8 @@ class MainActivity : AppCompatActivity() {
 				return true
 			}
 		})
+		// Bookmarks keep words, which fixed-layout pages don't lay out in pages of their own.
+		bookmarkToggle.isVisible = opened.metadata.layout != Layout.FIXED
 		// Fixed-layout pages can be zoomed and panned, so swipes stay theirs.
 		readerArea.onSwipe = if (opened.metadata.layout == Layout.FIXED) null else { leftward -> onSwipe(leftward) }
 		locatorJob = lifecycleScope.launch {
@@ -1089,6 +1113,13 @@ class MainActivity : AppCompatActivity() {
 		sectionTitlesJob = null
 		showsSections = false
 		resetSearch()
+		pageBookmarkJob?.cancel()
+		pageBookmarkJob = null
+		bookmarks = emptyList()
+		updateBookmarksTab()
+		bookmarkAdapter.submit(emptyList())
+		setPageBookmark(-1)
+		bookmarkToggle.isVisible = false
 		publication?.close()
 		publication = null
 		book = null
@@ -1180,6 +1211,7 @@ class MainActivity : AppCompatActivity() {
 			if (!onLastPage) showEnd(false)
 			updateFooter()
 			if (searchBar.isVisible && pendingJump?.isActive != true) placeSearchBar()
+			checkPageBookmark(locator)
 			preRasterWebViews(navigator?.view)
 		}
 	}
@@ -1558,7 +1590,9 @@ class MainActivity : AppCompatActivity() {
 		}, BAR_CONTROL_TIMEOUT_MS)
 	}
 
-	private fun showSection(target: Section) {
+	private fun showSection(requested: Section) {
+		// Bookmarks of a book that has none, such as another book's last section.
+		val target = if (requested == Section.BOOKMARKS && bookmarks.isEmpty()) Section.CONTENTS else requested
 		if (target != section) hideKeyboard()
 		section = target
 		sectionViews.forEach { (key, view) -> view.isVisible = key == target }
@@ -1566,6 +1600,7 @@ class MainActivity : AppCompatActivity() {
 		when (target) {
 			Section.LIBRARY -> refreshLibrary()
 			Section.CONTENTS -> showContents()
+			Section.BOOKMARKS -> showBookmarks()
 			Section.STYLES -> refreshFonts()
 			Section.SETTINGS -> setUpSettings()
 		}
@@ -1590,6 +1625,131 @@ class MainActivity : AppCompatActivity() {
 			showsSections -> tocEmpty.setText(R.string.toc_sections)
 		}
 		tocAdapter.activeIndex.takeIf { it >= 0 }?.let { tocList.scrollToPosition(it) }
+	}
+
+	// --- Bookmarks -------------------------------------------------------------
+
+	private fun bookmarkRows(): List<BookmarkRow> {
+		val rows = bookmarks.map { locator -> BookmarkRow(tocAdapter.entryFor(locator)?.title, bookmarkText(locator)) }
+		// The footer's chapter lookup was borrowed; put it back.
+		currentLocator?.let { tocAdapter.entryFor(it) }
+		return rows
+	}
+
+	private fun showBookmarks() {
+		bookmarkList.layoutDirection = tocList.layoutDirection
+		bookmarkAdapter.submit(bookmarkRows())
+	}
+
+	/** The tab shows while the book has bookmarks; removing the last one goes back to Contents. */
+	private fun updateBookmarksTab() {
+		tabViews.getValue(Section.BOOKMARKS).isVisible = bookmarks.isNotEmpty()
+		if (bookmarks.isEmpty() && section == Section.BOOKMARKS) {
+			if (menu.isVisible) showSection(Section.CONTENTS) else section = Section.CONTENTS
+		}
+	}
+
+	/** Adds a bookmark at the first word on the page, or removes the one the page has. */
+	private fun toggleBookmark() {
+		val nav = navigator ?: return
+		val here = currentLocator ?: return
+		val current = book ?: return
+		pageBookmarkJob?.cancel()
+		if (pageBookmark >= 0) {
+			saveBookmarks(bookmarks.filterIndexed { index, _ -> index != pageBookmark })
+			setPageBookmark(-1)
+			return
+		}
+		pageBookmarkJob = lifecycleScope.launch {
+			val words = runCatching { nav.evaluateJavascript(PAGE_WORD_SCRIPT) }.getOrNull()
+				?.let { runCatching { JSONObject(it) }.getOrNull() }
+			if (navigator !== nav || book !== current) return@launch
+			// A page without words, such as a picture, is kept by its place in the chapter.
+			val text = words?.let {
+				Locator.Text(before = it.optString("before"), highlight = it.optString("highlight"), after = it.optString("after"))
+			} ?: Locator.Text()
+			val added = here.copy(text = text)
+			val sorted = (bookmarks + added).sortedWith(
+				compareBy({ it.locations.totalProgression ?: 0.0 }, { it.locations.progression ?: 0.0 }),
+			)
+			saveBookmarks(sorted)
+			setPageBookmark(sorted.indexOf(added))
+		}
+	}
+
+	private fun saveBookmarks(list: List<Locator>) {
+		bookmarks = list
+		book?.let { library.saveBookmarks(it.id, list.map { locator -> locator.toJSON().toString() }) }
+		updateBookmarksTab()
+		if (menu.isVisible && section == Section.BOOKMARKS) showBookmarks()
+	}
+
+	private fun removeBookmark(index: Int) {
+		if (index !in bookmarks.indices) return
+		saveBookmarks(bookmarks.filterIndexed { each, _ -> each != index })
+		checkPageBookmark()
+	}
+
+	/** Looks for a bookmark on the page showing. Chapters without bookmarks cost nothing. */
+	private fun checkPageBookmark(locator: Locator? = currentLocator) {
+		pageBookmarkJob?.cancel()
+		pageBookmarkJob = null
+		val nav = navigator
+		val chapter = locator?.href?.removeFragment()
+		val candidates = if (nav == null || chapter == null) {
+			emptyList()
+		} else {
+			bookmarks.withIndex().filter { it.value.href.removeFragment().isEquivalent(chapter) }
+		}
+		val (withWords, withoutWords) = candidates.partition { !it.value.text.highlight.isNullOrBlank() }
+		// A page without words is known by its place in the chapter.
+		val progression = locator?.locations?.progression
+		withoutWords.firstOrNull { each ->
+			val at = each.value.locations.progression
+			progression != null && at != null && abs(at - progression) < SAME_PLACE
+		}?.let { return setPageBookmark(it.index) }
+		if (nav == null || withWords.isEmpty()) return setPageBookmark(-1)
+		pageBookmarkJob = lifecycleScope.launch {
+			val found = runCatching { nav.evaluateJavascript(pageBookmarkScript(withWords.map { it.value.text })) }
+				.getOrNull()?.toIntOrNull()
+			if (navigator !== nav) return@launch
+			setPageBookmark(found?.let { withWords.getOrNull(it)?.index } ?: -1)
+		}
+	}
+
+	private fun setPageBookmark(index: Int) {
+		pageBookmark = index
+		bookmarkToggle.isSelected = index >= 0
+		bookmarkToggle.contentDescription = getString(if (index >= 0) R.string.bookmark_remove else R.string.bookmark_add)
+	}
+
+	/** Turns to a bookmark's words, still under the menu, which closes once the page is ready. */
+	private fun goToBookmark(index: Int) {
+		val target = bookmarks.getOrNull(index) ?: return
+		val nav = navigator ?: return
+		// A jump to a bookmark starts a new trail; Back no longer returns to old links.
+		linkHistory.clear()
+		showEnd(false)
+		val here = currentLocator?.href?.removeFragment()
+		val sameChapter = here != null && here.isEquivalent(target.href.removeFragment())
+		val before = pageChanges
+		pendingJump?.cancel()
+		nav.go(target, animated = false)
+		pendingJump = lifecycleScope.launch {
+			// A move to the same page shows no new page.
+			withTimeoutOrNull(if (sameChapter) SAME_CHAPTER_JUMP_TIMEOUT_MS else JUMP_TIMEOUT_MS) {
+				while (pageChanges == before) delay(MATCH_LOOKUP_MS)
+			}
+			// Readium goes to where the page was; after a font change the words may be on another.
+			if (!target.text.highlight.isNullOrBlank()) {
+				val script = revealBookmarkScript(target.text)
+				for (attempt in 1..MATCH_LOOKUPS) {
+					if (runCatching { nav.evaluateJavascript(script) }.getOrNull()?.toDoubleOrNull() != null) break
+					delay(MATCH_LOOKUP_MS)
+				}
+			}
+			closeMenu()
+		}
 	}
 
 	// --- Search ----------------------------------------------------------------
@@ -2001,6 +2161,8 @@ class MainActivity : AppCompatActivity() {
 		const val LOW_MATCH = 0.8
 		const val MATCH_LOOKUPS = 10
 		const val MATCH_LOOKUP_MS = 100L
+		/** How close two places in a chapter are to be the same page. */
+		const val SAME_PLACE = 1e-6
 		/** Where a section's first heading is looked for: its opening bytes. */
 		const val SECTION_HEADING_BYTES = 16_384L
 		const val KEY_REPEAT_MS = 250L

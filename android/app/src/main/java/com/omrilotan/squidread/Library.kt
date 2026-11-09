@@ -50,6 +50,8 @@ data class Book(
 	val sha256: String? = null,
 	/** The authors, comma separated; empty when the book names none, null until read. */
 	var author: String? = null,
+	/** Bookmarks, as Readium locator JSON, in reading order. */
+	var bookmarks: List<String> = emptyList(),
 )
 
 /**
@@ -196,6 +198,12 @@ class Library(private val context: Context, private val covers: CoverCache) {
 			pendingLocatorSave = null
 			save()
 		}
+	}
+
+	fun saveBookmarks(id: String, bookmarks: List<String>) {
+		val book = books[id] ?: return
+		book.bookmarks = bookmarks
+		save()
 	}
 
 	fun flush() {
@@ -362,7 +370,8 @@ class Library(private val context: Context, private val covers: CoverCache) {
 					.put("locator", book.locator)
 					.put("pendingMetadata", book.pendingMetadata)
 					.put("sha256", book.sha256)
-					.put("author", book.author),
+					.put("author", book.author)
+					.apply { if (book.bookmarks.isNotEmpty()) put("bookmarks", JSONArray(book.bookmarks)) },
 			)
 		}
 	}.toString()
@@ -391,6 +400,9 @@ class Library(private val context: Context, private val covers: CoverCache) {
 					pendingMetadata = item.optBoolean("pendingMetadata"),
 					sha256 = item.optString("sha256").takeIf { SHA256.matches(it) },
 					author = if (item.has("author")) cleanTitle(item.optString("author")).orEmpty() else null,
+					bookmarks = item.optJSONArray("bookmarks")?.let { list ->
+						(0 until list.length()).mapNotNull { list.optString(it).takeIf(String::isNotEmpty) }
+					}.orEmpty(),
 				)
 			} catch (error: JSONException) {
 				continue
