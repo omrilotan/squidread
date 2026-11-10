@@ -2,9 +2,14 @@
 
 Releases of the Android app. Each entry's notes are what goes into Google Play's "Release notes" (500 characters at most).
 
+## 1.4.0 (versionCode 16)
+
+- More room for the book's title at the top of the menu: long titles get smaller to fit on one line.
+- A new logo: a black-and-white squid reading a book, made for e-ink.
+
 ## 1.3.0 (versionCode 15)
 
-- Bookmarks: mark a page with the bookmark button at the top of the menu, and find them in a Bookmarks tab, next to Contents. A bookmark keeps its words, so it still finds them after a change of font or size.
+- Bookmarks: mark a page with the bookmark button at the top of the menu, and find them in a Bookmarks tab.
 - Thinner lines and icons, for a lighter look.
 - A shorter hint under the tap zones.
 

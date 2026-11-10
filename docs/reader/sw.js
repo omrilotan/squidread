@@ -1,4 +1,4 @@
-const CACHE_NAME = 'squidread-shell-v12';
+const CACHE_NAME = 'squidread-shell-v13';
 // Relative to this script, so the reader works from any folder (omrilotan.com/squidread/reader/).
 // The mascot and favicon are the website's, one folder up.
 const ASSETS = [

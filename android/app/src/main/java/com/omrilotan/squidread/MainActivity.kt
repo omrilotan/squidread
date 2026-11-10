@@ -788,11 +788,33 @@ class MainActivity : AppCompatActivity() {
 		content.addView(label(R.string.zones_hint))
 		updateZoneButtons()
 
-		content.addView(heading(R.string.app_name))
+		// The logo, with the app's name and version beside it; the menu header leaves it to the book's title.
 		content.addView(
-			label(getString(R.string.version_label, packageManager.getPackageInfo(packageName, 0).versionName)).apply {
-				gravity = android.view.Gravity.START
-				setPadding(0, 0, 0, dp(12))
+			LinearLayout(this).apply {
+				orientation = LinearLayout.HORIZONTAL
+				gravity = android.view.Gravity.CENTER_VERTICAL
+				setPadding(0, dp(16), 0, dp(12))
+				addView(
+					ImageView(this@MainActivity).apply {
+						// The logo brings its own white disc, so it shows in both themes.
+						setImageResource(R.drawable.logo)
+						importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+					},
+					LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(12) },
+				)
+				addView(
+					LinearLayout(this@MainActivity).apply {
+						orientation = LinearLayout.VERTICAL
+						addView(heading(R.string.app_name).apply { setPadding(0, 0, 0, 0) })
+						addView(
+							label(getString(R.string.version_label, packageManager.getPackageInfo(packageName, 0).versionName)).apply {
+								gravity = android.view.Gravity.START
+								setPadding(0, 0, 0, 0)
+							},
+						)
+					},
+					LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+				)
 			},
 			LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT),
 		)

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- No background: the window paints the paper. Not a <merge>, since the insets are read from it. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:app="http://schemas.android.com/apk/res-auto"
   xmlns:tools="http://schemas.android.com/tools"
   android:id="@+id/root"
   android:layout_width="match_parent"
@@ -55,9 +56,7 @@
             android:layout_width="96dp"
             android:layout_height="96dp"
             android:layout_marginBottom="16dp"
-            android:background="@drawable/logo_background"
             android:contentDescription="@null"
-            android:padding="8dp"
             android:src="@drawable/logo" />
 
           <TextView
@@ -458,23 +457,21 @@
       android:orientation="horizontal"
       android:padding="8dp">
 
-      <ImageView
-        android:layout_width="38dp"
-        android:layout_height="38dp"
-        android:padding="3dp"
-        android:background="@drawable/logo_background"
-        android:importantForAccessibility="no"
-        android:src="@drawable/logo" />
-
+      <!-- One line, smaller for a long title, down to a size that still reads well, then cut short. -->
       <TextView
         android:id="@+id/menu_title"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:layout_weight="1"
         android:ellipsize="end"
-        android:paddingStart="12dp"
+        android:gravity="center_vertical|start"
+        android:maxLines="1"
+        android:paddingStart="8dp"
         android:paddingEnd="12dp"
-        android:singleLine="true"
+        app:autoSizeMaxTextSize="20sp"
+        app:autoSizeMinTextSize="14sp"
+        app:autoSizeStepGranularity="1sp"
+        app:autoSizeTextType="uniform"
         android:text="@string/app_name"
         android:textColor="@color/ink"
         android:textDirection="firstStrong"
