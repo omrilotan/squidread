@@ -1646,7 +1646,7 @@ class MainActivity : AppCompatActivity() {
 			empty -> tocEmpty.setText(if (navigator == null) R.string.no_contents else R.string.no_toc)
 			showsSections -> tocEmpty.setText(R.string.toc_sections)
 		}
-		tocAdapter.activeIndex.takeIf { it >= 0 }?.let { tocList.scrollToPosition(it) }
+		tocAdapter.activePosition.takeIf { it >= 0 }?.let { tocList.scrollToPosition(it) }
 	}
 
 	// --- Bookmarks -------------------------------------------------------------

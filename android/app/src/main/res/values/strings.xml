@@ -52,6 +52,8 @@
   <string name="bookmark_no_text">A page without text</string>
   <string name="no_toc">This book has no table of contents.</string>
   <string name="toc_sections">This book has no table of contents. Its sections, in order:</string>
+  <string name="toc_unfold">Show sections</string>
+  <string name="toc_fold">Hide sections</string>
   <string name="toc_section">Section %1$d</string>
   <string name="search_hint">Search in this book</string>
   <string name="search_clear">Clear search</string>

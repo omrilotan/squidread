@@ -1,16 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
-<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- A contents entry, which opens it, and in a long list a button that folds its sections. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
   android:layout_width="match_parent"
   android:layout_height="wrap_content"
   android:background="@drawable/toc_item"
   android:clickable="true"
   android:focusable="true"
   android:minHeight="48dp"
-  android:gravity="center_vertical|start"
-  android:paddingTop="10dp"
-  android:paddingBottom="10dp"
-  android:paddingEnd="16dp"
-  android:textAlignment="viewStart"
-  android:textColor="@color/button_text"
-  android:textDirection="firstStrong"
-  android:textSize="16sp" />
+  android:orientation="horizontal">
+
+  <TextView
+    android:id="@+id/toc_title"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_gravity="center_vertical"
+    android:layout_weight="1"
+    android:duplicateParentState="true"
+    android:paddingStart="16dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="10dp"
+    android:textAlignment="viewStart"
+    android:textColor="@color/button_text"
+    android:textDirection="firstStrong"
+    android:textSize="16sp" />
+
+  <ImageView
+    android:id="@+id/toc_fold"
+    android:layout_width="52dp"
+    android:layout_height="match_parent"
+    android:layout_marginBottom="1dp"
+    android:background="@drawable/toc_fold"
+    android:clickable="true"
+    android:focusable="true"
+    android:scaleType="center"
+    android:visibility="gone" />
+</LinearLayout>

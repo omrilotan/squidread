@@ -1,4 +1,4 @@
-const CACHE_NAME = 'squidread-shell-v13';
+const CACHE_NAME = 'squidread-shell-v14';
 // Relative to this script, so the reader works from any folder (omrilotan.com/squidread/reader/).
 // The mascot and favicon are the website's, one folder up.
 const ASSETS = [
@@ -22,20 +22,13 @@ const ASSETS = [
 
 self.addEventListener('install', (event) => {
   console.info('[squidread-sw] install');
+  // All or nothing: if any file fails, this version doesn't install and the one before keeps
+  // serving, so the reader still works offline. `cache: 'reload'` skips the browser's own
+  // HTTP cache, which could otherwise hand this version the previous version's files.
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        // Cache assets individually to avoid the entire install failing if one fails
-        return Promise.allSettled(
-          ASSETS.map((url) => 
-            cache.add(url).catch((err) => {
-              console.warn('[squidread-sw] Failed to cache asset:', url, err);
-            })
-          )
-        );
-      })
+      .then((cache) => cache.addAll(ASSETS.map((asset) => (typeof asset === 'string' ? new Request(asset, { cache: 'reload' }) : asset))))
       .then(() => self.skipWaiting())
-      .catch((err) => console.error('[squidread-sw] Install failed:', err))
   );
 });
 

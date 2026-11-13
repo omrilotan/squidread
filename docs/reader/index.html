@@ -38,6 +38,9 @@
     <symbol id="icon-font-size" viewBox="0 0 24 24"><path d="M2 20l3.5-9 3.5 9M3.4 16.5h4.2M10 20l5.5-16L21 20M12 14.5h7"/></symbol>
     <symbol id="icon-line-spacing" viewBox="0 0 24 24"><path d="M11 6h10M11 12h10M11 18h10M5 4v16M2.5 6.5L5 4l2.5 2.5M2.5 17.5L5 20l2.5-2.5"/></symbol>
     <symbol id="icon-margins" viewBox="0 0 28 24"><path d="M2 3v18M26 3v18M6 12h6M9.5 9.5L12 12l-2.5 2.5M22 12h-6M18.5 9.5L16 12l2.5 2.5"/></symbol>
+    <symbol id="icon-fold-closed" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="icon-fold-open" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="icon-bookmark" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-5-6 5z"/></symbol>
     <symbol id="icon-font" viewBox="0 0 24 24"><path d="M5 8V5h14v3M12 5v14M9 19h6"/></symbol>
     <symbol id="icon-align-book" viewBox="0 0 24 24"><path d="M12 7C9.5 5 6 4.5 3 5.5v13c3-1 6.5-.5 9 1.5 2.5-2 6-2.5 9-1.5v-13C18 4.5 14.5 5 12 7zM12 7v13"/></symbol>
     <symbol id="icon-align-justified" viewBox="0 0 24 24"><path d="M3 5h18M3 10h18M3 15h18M3 20h18"/></symbol>
@@ -109,12 +112,14 @@
       <div class="panelHeader">
         <img src="../icon.png" alt="" class="panelIcon" width="40" height="40" />
         <h2 id="menuTitle">Squidread</h2>
+        <button id="bookmarkToggle" class="closeButton bookmarkToggle hidden" type="button" aria-pressed="false" title="Bookmark this page" aria-label="Bookmark this page"><svg class="icon" aria-hidden="true"><use href="#icon-bookmark"/></svg></button>
         <button id="closePanel" class="closeButton" title="Close menu" aria-label="Close menu">✕</button>
       </div>
 
       <nav class="panelNav">
         <button id="navStyles" class="navBtn active" title="Reading styles" aria-label="Reading styles"><svg class="icon" aria-hidden="true"><use href="#icon-styles"/></svg></button>
         <button id="navContents" class="navBtn" title="Contents" aria-label="Contents"><svg class="icon" aria-hidden="true"><use href="#icon-contents"/></svg></button>
+        <button id="navBookmarks" class="navBtn hidden" title="Bookmarks" aria-label="Bookmarks"><svg class="icon" aria-hidden="true"><use href="#icon-bookmark"/></svg></button>
         <button id="navLibrary" class="navBtn" title="Library" aria-label="Library"><svg class="icon" aria-hidden="true"><use href="#icon-library"/></svg></button>
         <button id="navSettings" class="navBtn" title="Settings" aria-label="Settings"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg></button>
       </nav>
@@ -144,6 +149,11 @@
           <ul id="tocList" class="tocList">
             <li class="meta">Open a book to see its table of contents.</li>
           </ul>
+        </section>
+
+        <!-- Shown while the book has bookmarks; each keeps its chapter and the words it starts at. -->
+        <section id="bookmarksSection" class="panelSection">
+          <ul id="bookmarkList" class="tocList"></ul>
         </section>
 
         <section id="stylesSection" class="panelSection active">

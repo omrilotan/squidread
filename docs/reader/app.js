@@ -40,6 +40,9 @@ const bookEndEl = document.getElementById('bookEnd');
 const bookEndTitleEl = document.getElementById('bookEndTitle');
 const deleteDialogEl = document.getElementById('deleteDialog');
 const noteDialogEl = document.getElementById('noteDialog');
+const bookmarkToggleEl = document.getElementById('bookmarkToggle');
+const navBookmarksEl = document.getElementById('navBookmarks');
+const bookmarkListEl = document.getElementById('bookmarkList');
 
 const wait = (ms) => new Promise((res) => setTimeout(res, ms));
 
@@ -62,6 +65,9 @@ const MAX_PACKAGE_BYTES = 4 * 1024 * 1024;
 const MAX_TITLE_LENGTH = 500;
 const MAX_TOC_DEPTH = 32;
 const MAX_INDENT_DEPTH = 6;
+const TOC_INDENT_PX = 20;
+// Contents longer than this fold each entry's sections; shorter ones show every entry.
+const TOC_FOLD_THRESHOLD = 60;
 const DC_NAMESPACE = 'http://purl.org/dc/elements/1.1/';
 const OPS_NAMESPACE = 'http://www.idpf.org/2007/ops';
 // The book can make a note anything; a note is never this long.
@@ -160,6 +166,10 @@ let resizeTimer = null;
 let lastClockUpdate = 0;
 // The contents list, flat, as numbered in the footer; sections stand in for a missing one.
 let tocEntries = [];
+/** Entries whose sections are hidden, by their place in tocEntries. */
+const tocFolded = new Set();
+/** The entry of the page showing, by its place in tocEntries; -1 for none. */
+let tocActive = -1;
 let showsSections = false;
 // Where links were followed from, so Back returns there; see followLink.
 const linkHistory = [];
@@ -167,6 +177,8 @@ const MAX_LINK_HISTORY = 20;
 let ignoredPops = 0;
 // Where the reader was when the font size last changed, kept until the page is turned.
 let keptPlace = null;
+/** The bookmark on the page showing, by its place in the book's bookmarks; -1 for none. */
+let pageBookmark = -1;
 let placeTimer = null;
 const KEEP_PLACE_MS = 150;
 const KEEP_PLACE_TRIES = 3;
@@ -419,6 +431,19 @@ function wireEvents() {
   // Wire up navigation buttons
   document.getElementById('navLibrary')?.addEventListener('click', () => switchPanelSection('library'));
   document.getElementById('navContents')?.addEventListener('click', () => switchPanelSection('contents'));
+  navBookmarksEl?.addEventListener('click', () => switchPanelSection('bookmarks'));
+  bookmarkToggleEl?.addEventListener('click', () => toggleBookmark());
+  bookmarkListEl?.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const remove = target.closest('.bookmarkRemove');
+    if (remove) {
+      removeBookmark(Number(remove.dataset.index));
+      return;
+    }
+    const open = target.closest('.bookmarkItem');
+    if (open) goToBookmark(Number(open.dataset.index));
+  });
   document.getElementById('navStyles')?.addEventListener('click', () => switchPanelSection('styles'));
   document.getElementById('navSettings')?.addEventListener('click', () => switchPanelSection('settings'));
 
@@ -496,7 +521,13 @@ function wireEvents() {
 
   tocListEl?.addEventListener('click', async (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
+    // The fold button's icon is an SVG element, not an HTML one.
+    if (!(target instanceof Element)) return;
+    const fold = target.closest('.tocFold');
+    if (fold) {
+      toggleTocFold(Number(fold.dataset.index));
+      return;
+    }
     const button = target.closest('.tocItem');
     if (!button) return;
     const href = button.dataset.href;
@@ -1741,6 +1772,143 @@ async function withSectionDocument(opened, section, read) {
 }
 
 /** The contents list, or a note saying why there is none, or what stands in for it. */
+// --- Bookmarks ---------------------------------------------------------------
+// A bookmark keeps the place where its page started, and the words there. A font or size
+// change moves the place to another page; the bookmark goes with it.
+
+function bookmarksOf() {
+  return currentRecord?.bookmarks || [];
+}
+
+function compareCfi(a, b) {
+  try {
+    return new ePub.CFI().compare(a, b);
+  } catch {
+    return 0;
+  }
+}
+
+/** Which bookmark is on the page showing: its place in the list, or -1. */
+function bookmarkOnPage(location) {
+  const start = location?.start?.cfi;
+  const end = location?.end?.cfi;
+  if (!start || !end) return -1;
+  return bookmarksOf().findIndex((bookmark) => compareCfi(bookmark.cfi, start) >= 0 && compareCfi(bookmark.cfi, end) <= 0);
+}
+
+function setPageBookmark(index) {
+  pageBookmark = index;
+  const label = index >= 0 ? 'Remove bookmark' : 'Bookmark this page';
+  bookmarkToggleEl.setAttribute('aria-pressed', String(index >= 0));
+  bookmarkToggleEl.title = label;
+  bookmarkToggleEl.setAttribute('aria-label', label);
+}
+
+/** The words from the place on, about a line and a half of them; null for a page without text. */
+function wordsAt(cfi) {
+  try {
+    const range = rendition.getRange(cfi);
+    const doc = range?.startContainer?.ownerDocument;
+    if (!doc?.body) return null;
+    const rest = doc.createRange();
+    rest.setStart(range.startContainer, range.startOffset);
+    rest.setEnd(doc.body, doc.body.childNodes.length);
+    const text = collapse(rest.toString()).trim();
+    return text ? takeWords(text, 100) : null;
+  } catch (error) {
+    log.debug('Could not read the bookmark\'s words:', error);
+    return null;
+  }
+}
+
+/** Adds a bookmark where the page starts, or removes the one the page has. */
+async function toggleBookmark() {
+  if (!rendition || !currentRecord) return;
+  const list = bookmarksOf();
+  if (pageBookmark >= 0) {
+    await saveBookmarks(list.filter((_, index) => index !== pageBookmark));
+    setPageBookmark(-1);
+    return;
+  }
+  const start = rendition.currentLocation?.()?.start;
+  if (!start?.cfi) return;
+  const added = { cfi: start.cfi, href: start.href || null, text: wordsAt(start.cfi) };
+  const sorted = [...list, added].sort((a, b) => compareCfi(a.cfi, b.cfi));
+  await saveBookmarks(sorted);
+  setPageBookmark(sorted.indexOf(added));
+}
+
+async function saveBookmarks(list) {
+  if (!currentRecord) return;
+  currentRecord.bookmarks = list;
+  await db.put('books', currentRecord);
+  updateBookmarks();
+}
+
+async function removeBookmark(index) {
+  const list = bookmarksOf();
+  if (!(index >= 0 && index < list.length)) return;
+  await saveBookmarks(list.filter((_, each) => each !== index));
+  setPageBookmark(bookmarkOnPage(rendition?.currentLocation?.()));
+}
+
+/** The tab shows while the book has bookmarks; removing the last one goes back to Contents. */
+function updateBookmarks() {
+  const empty = !bookmarksOf().length;
+  navBookmarksEl.classList.toggle('hidden', empty);
+  if (getActivePanelSection() !== 'bookmarks') return;
+  if (empty) switchPanelSection('contents');
+  else renderBookmarks();
+}
+
+function renderBookmarks() {
+  bookmarkListEl.innerHTML = '';
+  bookmarkListEl.dir = tocListEl.dir;
+  bookmarksOf().forEach((bookmark, index) => {
+    const li = document.createElement('li');
+    li.className = 'bookmarkRow';
+    const open = document.createElement('button');
+    open.className = 'searchItem bookmarkItem';
+    open.dataset.index = index;
+    const chapter = tocEntryFor(bookmark.href)?.title;
+    if (chapter) {
+      const name = document.createElement('span');
+      name.className = 'searchChapter';
+      name.dir = 'auto';
+      name.textContent = chapter;
+      open.appendChild(name);
+    }
+    const text = document.createElement('span');
+    text.className = 'searchText bookmarkText';
+    text.dir = 'auto';
+    text.textContent = bookmark.text ? `${bookmark.text}…` : 'A page without text';
+    open.appendChild(text);
+    const remove = document.createElement('button');
+    remove.className = 'bookmarkRemove';
+    remove.dataset.index = index;
+    remove.title = 'Remove bookmark';
+    remove.setAttribute('aria-label', 'Remove bookmark');
+    remove.textContent = '✕';
+    li.append(open, remove);
+    bookmarkListEl.appendChild(li);
+  });
+}
+
+async function goToBookmark(index) {
+  const bookmark = bookmarksOf()[index];
+  if (!bookmark || !rendition) return;
+  // A jump to a bookmark starts a new trail; Back no longer returns to old links.
+  clearLinkHistory();
+  showEnd(false);
+  keptPlace = null;
+  try {
+    await rendition.display(bookmark.cfi);
+    closePanel();
+  } catch (error) {
+    log.warn('Failed to open bookmark:', error);
+  }
+}
+
 function renderToc() {
   if (!tocListEl) return;
   tocListEl.innerHTML = '';
@@ -1758,19 +1926,86 @@ function renderToc() {
     tocListEl.appendChild(li);
   }
 
+  // Bold chapters only where there are sections under them to tell them from.
+  const nested = tocEntries.some((entry) => entry.depth > 0);
+  const foldable = tocEntries.length > TOC_FOLD_THRESHOLD;
+  // Entries deeper than this are inside a folded entry.
+  let hiddenBelow = Infinity;
   tocEntries.forEach((entry, index) => {
+    if (entry.depth > hiddenBelow) return;
+    hiddenBelow = tocFolded.has(index) ? entry.depth : Infinity;
     const li = document.createElement('li');
+    li.className = 'tocRow';
+    // Sections sit in from their chapter, line and all; deeper ones keep the deepest indent.
+    li.style.marginInlineStart = `${Math.min(entry.depth, MAX_INDENT_DEPTH) * TOC_INDENT_PX}px`;
     const btn = document.createElement('button');
     btn.className = 'tocItem';
+    btn.classList.toggle('top', nested && entry.depth === 0);
+    btn.classList.toggle('active', index === tocActive);
     btn.dataset.href = entry.href;
     btn.dataset.index = index;
     btn.textContent = entry.title;
-    // Deeper entries keep this indent, so they never squeeze to nothing.
-    btn.style.paddingInlineStart = `${16 + Math.min(entry.depth, MAX_INDENT_DEPTH) * 16}px`;
     btn.disabled = !entry.href;
     li.appendChild(btn);
+    if (foldable && tocHasSections(index)) {
+      const isFolded = tocFolded.has(index);
+      const fold = document.createElement('button');
+      fold.className = 'tocFold';
+      fold.classList.toggle('folded', isFolded);
+      fold.dataset.index = index;
+      fold.setAttribute('aria-expanded', String(!isFolded));
+      const label = isFolded ? 'Show sections' : 'Hide sections';
+      fold.title = label;
+      fold.setAttribute('aria-label', label);
+      fold.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#icon-fold-${isFolded ? 'closed' : 'open'}"/></svg>`;
+      li.appendChild(fold);
+    }
     tocListEl.appendChild(li);
   });
+}
+
+function tocHasSections(index) {
+  const next = tocEntries[index + 1];
+  return Boolean(next) && next.depth > tocEntries[index].depth;
+}
+
+/** A long list starts with every entry folded; the page showing unfolds its way. */
+function resetTocFolds() {
+  tocFolded.clear();
+  tocActive = -1;
+  if (tocEntries.length <= TOC_FOLD_THRESHOLD) return;
+  tocEntries.forEach((_, index) => {
+    if (tocHasSections(index)) tocFolded.add(index);
+  });
+}
+
+/** Shows the entry, and its own sections; true if anything was folded. */
+function unfoldTocTo(index) {
+  let changed = tocFolded.delete(index);
+  let depth = tocEntries[index].depth;
+  for (let each = index - 1; each >= 0 && depth > 0; each--) {
+    if (tocEntries[each].depth < depth) {
+      changed = tocFolded.delete(each) || changed;
+      depth = tocEntries[each].depth;
+    }
+  }
+  return changed;
+}
+
+function toggleTocFold(index) {
+  if (!tocFolded.delete(index)) tocFolded.add(index);
+  renderToc();
+}
+
+function setTocActive(index) {
+  if (index === tocActive) return;
+  tocActive = index;
+  if (index >= 0 && unfoldTocTo(index)) {
+    renderToc();
+    return;
+  }
+  tocListEl.querySelectorAll('.tocItem.active').forEach((item) => item.classList.remove('active'));
+  tocListEl.querySelector(`.tocItem[data-index="${index}"]`)?.classList.add('active');
 }
 
 /** The first entry pointing at the section, as the footer names it. */
@@ -1980,10 +2215,14 @@ async function loadBook(id) {
   }
   showsSections = !tocEntries.length;
   if (showsSections) tocEntries = buildSections();
+  resetTocFolds();
   // Nor the book's list of printed pages, which it needs to report where each page is.
   book.pageList ??= { pageFromCfi: () => -1, destroy() {} };
   renderToc();
   searchRowEl.classList.remove('hidden');
+  // Fixed-layout pages have no words of their own to keep a bookmark by.
+  bookmarkToggleEl.classList.toggle('hidden', metadata.layout === 'pre-paginated');
+  updateBookmarks();
 
   const opened = book;
   const styleSheets = new Map();
@@ -2030,6 +2269,7 @@ async function loadBook(id) {
     // Moved away from the end, by the contents or a new layout: the page itself shows.
     if (!location?.atEnd) showEnd(false);
     if (!searchBarEl.classList.contains('hidden')) placeSearchBar();
+    setPageBookmark(bookmarkOnPage(location));
     currentRecord.lastLocation = location?.start?.cfi || null;
     await db.put('books', currentRecord);
   });
@@ -2481,6 +2721,8 @@ function switchPanelSection(section) {
     sec.classList.toggle('active', sec === panel);
   });
   
+  if (section === 'bookmarks') renderBookmarks();
+
   // Scroll the active TOC item, or search result, into view if switching to contents
   if (section === 'contents') {
     setTimeout(() => {
@@ -2517,6 +2759,10 @@ function clearViewer() {
   }
   tocEntries = [];
   showsSections = false;
+  resetTocFolds();
+  bookmarkToggleEl.classList.add('hidden');
+  setPageBookmark(-1);
+  updateBookmarks();
   searchRowEl.classList.add('hidden');
   renderToc();
   refreshEmptyState();
@@ -2549,7 +2795,7 @@ function openPanel(section) {
 }
 
 function cyclePanelSection(direction) {
-  const sections = ['styles', 'contents', 'library', 'settings'];
+  const sections = ['styles', 'contents', ...(navBookmarksEl.classList.contains('hidden') ? [] : ['bookmarks']), 'library', 'settings'];
   const current = getActivePanelSection();
   const currentIndex = Math.max(0, sections.indexOf(current));
   const nextIndex = (currentIndex + direction + sections.length) % sections.length;
@@ -2816,11 +3062,7 @@ function updateChapterInfo(location) {
     const entry = tocEntryFor(section.href);
     
     // Update active TOC item
-    if (tocListEl) {
-      tocListEl.querySelectorAll('.tocItem.active').forEach((item) => item.classList.remove('active'));
-      const index = entry ? tocEntries.indexOf(entry) : -1;
-      tocListEl.querySelector(`.tocItem[data-index="${index}"]`)?.classList.add('active');
-    }
+    if (tocListEl) setTocActive(entry ? tocEntries.indexOf(entry) : -1);
     
     // Chapter name, then the page within the chapter (no prefix)
     const parts = [];
@@ -2860,8 +3102,33 @@ function readFileWithProgress(file, onProgress) {
 
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
+  // A page that already had a worker gets a new one only after an update: then its files are
+  // stale. The first install doesn't count.
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  let updatePending = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) return;
+    // Never reload under the reader's page; a book that's open picks up the update next time.
+    if (book) {
+      log.info('Update ready; applies when the reader next opens');
+      updatePending = true;
+      return;
+    }
+    location.reload();
+  });
   navigator.serviceWorker.register('sw.js')
-    .then((reg) => log.info('SW registered:', reg.scope))
+    .then((reg) => {
+      log.info('SW registered:', reg.scope);
+      // Check again whenever the reader comes back into view, so a long-open tab still updates.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible') return;
+        if (updatePending && !book) {
+          location.reload();
+          return;
+        }
+        reg.update().catch((error) => log.debug('SW update check failed', error));
+      });
+    })
     .catch((error) => log.warn('SW registration failed', error));
 }
 

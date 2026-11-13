@@ -2,6 +2,10 @@
 
 Releases of the Android app. Each entry's notes are what goes into Google Play's "Release notes" (500 characters at most).
 
+## 1.5.0 (versionCode 17)
+
+- Table of contents shows section hierarchy; long ones fold.
+
 ## 1.4.0 (versionCode 16)
 
 - More room for the book's title at the top of the menu: long titles get smaller to fit on one line.

@@ -417,6 +417,69 @@ button:disabled:active {
   color: var(--paper);
 }
 
+.tocItem.top {
+  font-weight: 700;
+}
+
+/* A contents entry, and in a long list a button that folds its sections. */
+.tocRow {
+  display: flex;
+}
+
+.tocRow .tocItem {
+  flex: 1;
+  min-width: 0;
+}
+
+.tocFold {
+  flex: none;
+  width: 52px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--ink);
+}
+
+.tocItem.active + .tocFold {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* Folded, the chevron points the way the book reads. */
+.tocList[dir="rtl"] .tocFold.folded .icon {
+  transform: scaleX(-1);
+}
+
+/* --- Bookmarks: chapter and words, which open it, and a button that removes it ----- */
+
+.bookmarkRow {
+  display: flex;
+}
+
+.bookmarkItem {
+  flex: 1;
+  min-width: 0;
+}
+
+.bookmarkText {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.bookmarkRemove {
+  flex: none;
+  width: 52px;
+  border: 0;
+  border-bottom: 1px solid var(--ink);
+  font-size: 20px;
+}
+
+.bookmarkToggle .icon {
+  width: 28px;
+  height: 28px;
+}
+
 /* --- Search: the book's, in Contents, and the library's ----------------------- */
 
 /* A field in a heavy frame, with a button to clear it once there is something to clear. */

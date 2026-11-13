@@ -1,0 +1,18 @@
+#!/bin/sh
+# Stops a push that changes the web reader's files without a new CACHE_NAME in sw.js:
+# installed readers would keep the old files. Enable once with: git config core.hooksPath .githooks
+# Skip with: git push --no-verify
+zero=0000000000000000000000000000000000000000
+while read -r local_ref local_sha remote_ref remote_sha; do
+	[ "$local_sha" = "$zero" ] && continue
+	if [ "$remote_sha" = "$zero" ]; then range="$local_sha"; else range="$remote_sha..$local_sha"; fi
+	changed=$(git diff --name-only "$range" -- docs/reader docs/favicon.png docs/icon.png 2>/dev/null)
+	[ -z "$changed" ] && continue
+	if ! git diff "$range" -- docs/reader/sw.js | grep -q '^+const CACHE_NAME'; then
+		echo "pre-push: the web reader changed but CACHE_NAME in docs/reader/sw.js didn't." >&2
+		echo "Bump it so installed readers pick up the change, or push with --no-verify." >&2
+		echo "$changed" | sed 's/^/  /' >&2
+		exit 1
+	fi
+done
+exit 0
